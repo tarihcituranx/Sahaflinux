@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Dijital Sahaf
+GenericName=Tarihi Gazete ve Dergi Arşivi
+Comment=Türkiye'deki tarihi gazete ve dergilere erişim sağlar
+Exec=dijital-sahaf
+Icon=document-open
+Terminal=false
+Categories=Office;Utility;Archiving;
+Keywords=gazete;dergi;arşiv;tarih;newspaper;magazine;archive;
+StartupNotify=true
+StartupWMClass=dijital-sahaf
