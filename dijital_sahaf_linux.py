@@ -18,6 +18,10 @@ import requests
 from io import BytesIO
 from PIL import Image, ImageTk
 import time
+import re
+import shutil
+import webbrowser
+import platform
 
 # XDG Base Directory Specification
 XDG_CONFIG_HOME = Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config'))
@@ -189,7 +193,7 @@ GAZETE_DATABASE = {
         "years": (1992, 2024)
     },
     "Popular Science Türkiye": {
-        "url_parameter": "https://www.popsci.com.tr/arsiv/{year}/{month:02d}",
+        "url_pattern": "https://www.popsci.com.tr/arsiv/{year}/{month:02d}",
         "type": "dergi",
         "years": (2004, 2024)
     },
@@ -290,6 +294,64 @@ GAZETE_DATABASE = {
     }
 }
 
+# GasteArsivi.com Gazete Veritabanı
+GASTE_ARSIVI_DATABASE = [
+    {"id": "ahali-filibe", "name": "Ahali (Filibe)", "publication_dates": "1895-1908", "issue_count": 3000, "description": "Filibe'de yayımlanan Türkçe gazete"},
+    {"id": "akbaba", "name": "Akbaba", "publication_dates": "1922-1977", "issue_count": 2800, "description": "Mizah ve karikatür dergisi"},
+    {"id": "akis", "name": "Akis", "publication_dates": "1954-1977", "issue_count": 1200, "description": "Haber ve siyaset dergisi"},
+    {"id": "aksam", "name": "Akşam", "publication_dates": "1918-Günümüz", "issue_count": 38000, "description": "Türk günlük gazetesi"},
+    {"id": "anadolu", "name": "Anadolu", "publication_dates": "1924-1945", "issue_count": 7500, "description": "Ankara'da yayımlanan gazete"},
+    {"id": "ant", "name": "Ant", "publication_dates": "1967-1980", "issue_count": 450, "description": "Sol görüşlü dergi"},
+    {"id": "aydede", "name": "Aydede", "publication_dates": "1922-1923", "issue_count": 85, "description": "Mizah dergisi"},
+    {"id": "agac", "name": "Ağaç", "publication_dates": "1936-1949", "issue_count": 650, "description": "Kültür ve sanat dergisi"},
+    {"id": "balkan", "name": "Balkan", "publication_dates": "1904-1912", "issue_count": 2100, "description": "Balkanlarda yayımlanan gazete"},
+    {"id": "bilim-teknik", "name": "Bilim ve Teknik", "publication_dates": "1967-Günümüz", "issue_count": 650, "description": "TÜBİTAK bilim dergisi"},
+    {"id": "birgun", "name": "Birgün", "publication_dates": "2004-Günümüz", "issue_count": 7000, "description": "Sol görüşlü günlük gazete"},
+    {"id": "bugun", "name": "Bugün", "publication_dates": "1973-1992", "issue_count": 6500, "description": "Günlük gazete"},
+    {"id": "buyuk-dogu", "name": "Büyük Doğu", "publication_dates": "1943-1978", "issue_count": 350, "description": "Fikir ve sanat dergisi"},
+    {"id": "commodore", "name": "Commodore", "publication_dates": "1988-1996", "issue_count": 95, "description": "Bilgisayar dergisi"},
+    {"id": "cumhuriyet", "name": "Cumhuriyet", "publication_dates": "1924-Günümüz", "issue_count": 35000, "description": "Türkiye'nin en köklü gazetelerinden"},
+    {"id": "demokrat-izmir", "name": "Demokrat İzmir", "publication_dates": "1946-1960", "issue_count": 4200, "description": "İzmir'de yayımlanan gazete"},
+    {"id": "diyojen", "name": "Diyojen", "publication_dates": "1869-1871", "issue_count": 85, "description": "İlk Türk mizah dergisi"},
+    {"id": "dunya", "name": "Dünya", "publication_dates": "1952-Günümüz", "issue_count": 25000, "description": "Ekonomi ve finans gazetesi"},
+    {"id": "girgir", "name": "Gırgır", "publication_dates": "1972-2017", "issue_count": 2300, "description": "Mizah dergisi"},
+    {"id": "hakimiyet-i-milliye", "name": "Hakimiyet-i Milliye", "publication_dates": "1920-1934", "issue_count": 5000, "description": "Milli mücadele dönemi gazetesi"},
+    {"id": "hayat", "name": "Hayat", "publication_dates": "1926-1963", "issue_count": 1400, "description": "Haftalık haber ve kültür dergisi"},
+    {"id": "kadro", "name": "Kadro", "publication_dates": "1932-1935", "issue_count": 38, "description": "Fikir ve sanat dergisi"},
+    {"id": "kurun", "name": "Kurun", "publication_dates": "1933-1945", "issue_count": 4300, "description": "Günlük gazete"},
+    {"id": "markopasa", "name": "Markopaşa", "publication_dates": "1946-1947", "issue_count": 54, "description": "Mizah gazetesi"},
+    {"id": "milli-gazete", "name": "Milli Gazete", "publication_dates": "1973-Günümüz", "issue_count": 18000, "description": "İslami görüşlü günlük gazete"},
+    {"id": "nokta", "name": "Nokta", "publication_dates": "1982-1999", "issue_count": 850, "description": "Haftalık haber dergisi"},
+    {"id": "peyam", "name": "Peyam", "publication_dates": "1914-1918", "issue_count": 1200, "description": "Osmanlı dönemi gazetesi"},
+    {"id": "resimli-ay", "name": "Resimli Ay", "publication_dates": "1929-1931", "issue_count": 28, "description": "Kültür ve sanat dergisi"},
+    {"id": "sebilurresad", "name": "Sebilürreşad", "publication_dates": "1908-1925", "issue_count": 600, "description": "İslami dergi"},
+    {"id": "serbes-cumhuriyet", "name": "Serbes Cumhuriyet", "publication_dates": "1930-1930", "issue_count": 65, "description": "Muhalif gazete"},
+    {"id": "servet-i-funun", "name": "Servet-i Fünun", "publication_dates": "1891-1944", "issue_count": 2000, "description": "Edebiyat ve sanat dergisi"},
+    {"id": "son-posta", "name": "Son Posta", "publication_dates": "1930-1960", "issue_count": 10000, "description": "Günlük gazete"},
+    {"id": "tan", "name": "Tan", "publication_dates": "1935-1945", "issue_count": 3500, "description": "Günlük gazete"},
+    {"id": "tanin", "name": "Tanin", "publication_dates": "1908-1925", "issue_count": 6000, "description": "İttihat ve Terakki gazetesi"},
+    {"id": "taraf", "name": "Taraf", "publication_dates": "2007-2016", "issue_count": 3100, "description": "Günlük gazete"},
+    {"id": "tasviri-efkar", "name": "Tasviri Efkar", "publication_dates": "1862-1925", "issue_count": 22000, "description": "Osmanlı dönemi gazetesi"},
+    {"id": "ulus", "name": "Ulus", "publication_dates": "1934-2009", "issue_count": 26000, "description": "CHP gazetesi"},
+    {"id": "vakit", "name": "Vakit", "publication_dates": "1917-1955", "issue_count": 13000, "description": "Günlük gazete"},
+    {"id": "vatan", "name": "Vatan", "publication_dates": "1923-Günümüz", "issue_count": 28000, "description": "Günlük gazete"},
+    {"id": "yarim-ay", "name": "Yarım Ay", "publication_dates": "1935-1945", "issue_count": 240, "description": "Edebiyat dergisi"},
+    {"id": "yarin", "name": "Yarın", "publication_dates": "1948-1967", "issue_count": 950, "description": "Fikir ve sanat dergisi"},
+    {"id": "yeni-asir", "name": "Yeni Asır", "publication_dates": "1895-Günümüz", "issue_count": 42000, "description": "İzmir'in köklü gazetesi"},
+    {"id": "zaman", "name": "Zaman", "publication_dates": "1986-2016", "issue_count": 10500, "description": "Günlük gazete"},
+    {"id": "irade-i-milliye", "name": "İrade-i Milliye", "publication_dates": "1919-1922", "issue_count": 800, "description": "Milli mücadele gazetesi"},
+    {"id": "gunaydin", "name": "Günaydın", "publication_dates": "1968-Günümüz", "issue_count": 19000, "description": "Günlük gazete"},
+    {"id": "haberturk", "name": "Habertürk", "publication_dates": "2001-Günümüz", "issue_count": 8000, "description": "Günlük gazete"},
+    {"id": "hurriyet", "name": "Hürriyet", "publication_dates": "1948-Günümüz", "issue_count": 27000, "description": "Türkiye'nin en çok satan gazetesi"},
+    {"id": "milliyet", "name": "Milliyet", "publication_dates": "1950-Günümüz", "issue_count": 26000, "description": "Köklü günlük gazete"},
+    {"id": "sabah", "name": "Sabah", "publication_dates": "1985-Günümüz", "issue_count": 14000, "description": "Günlük gazete"},
+    {"id": "sozcu", "name": "Sözcü", "publication_dates": "2007-Günümüz", "issue_count": 6200, "description": "Muhalif günlük gazete"},
+    {"id": "yeni-safak", "name": "Yeni Şafak", "publication_dates": "1970-Günümüz", "issue_count": 19000, "description": "İslami görüşlü günlük gazete"},
+    {"id": "takvim-i-vekayi", "name": "Takvim-i Vekayi", "publication_dates": "1831-1922", "issue_count": 4200, "description": "Osmanlı resmi gazetesi"},
+    {"id": "tercuman-i-ahval", "name": "Tercüman-ı Ahval", "publication_dates": "1860-1866", "issue_count": 450, "description": "İlk özel Türk gazetesi"},
+    {"id": "ceride-i-havadis", "name": "Ceride-i Havadis", "publication_dates": "1840-1864", "issue_count": 1200, "description": "İlk Türk gazetesi"}
+]
+
 
 class DigitalSahafApp:
     """Ana uygulama sınıfı"""
@@ -329,6 +391,23 @@ class DigitalSahafApp:
         # İndirme durumu
         self.is_downloading = False
         self.cancel_download = False
+        
+        # GasteArsivi verileri
+        self.raw_data = GASTE_ARSIVI_DATABASE
+        self.veri_havuzu = {item["name"]: item for item in GASTE_ARSIVI_DATABASE}
+        
+        # Cache sistemi
+        self.cache_file = CACHE_DIR / "tarama_gecmisi.json"
+        self.tarama_onbellegi = self.cache_yukle()
+        
+        # Yasal uyarı metni
+        self.yasal_metin = (
+            "YASAL UYARI:\n\n"
+            "1. Bu yazılım sadece akademik araştırma, kişisel arşivleme ve eğitim amaçlıdır.\n"
+            "2. İndirilen materyallerin telif hakları ilgili yayıncı kuruluşlara veya arşiv sahiplerine aittir.\n"
+            "3. Bu materyallerin ticari amaçla kullanımı, yeniden dağıtımı kullanıcının sorumluluğundadır.\n"
+            "4. Yazılım geliştiricisi, kullanıcıların eylemlerinden sorumlu tutulamaz."
+        )
         
         # Config yükle
         self.config = self.load_config()
@@ -403,6 +482,18 @@ class DigitalSahafApp:
                                  bg=self.colors['bg'],
                                  fg='#5e5c64')
         subtitle_label.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Yasal uyarı butonu
+        tk.Button(header_frame,
+                 text="⚖ Yasal Uyarı",
+                 command=self.yasal_uyari_goster,
+                 bg=self.colors['warning'],
+                 fg='white',
+                 font=self.fonts['small'],
+                 relief=tk.FLAT,
+                 padx=10,
+                 pady=5,
+                 cursor='hand2').pack(side=tk.RIGHT)
         
         # Ana içerik paneli
         content_frame = ttk.Frame(main_container, style='Card.TFrame')
@@ -655,6 +746,17 @@ class DigitalSahafApp:
                  padx=15,
                  pady=10,
                  cursor='hand2').pack(side=tk.LEFT)
+        
+        tk.Button(button_frame,
+                 text="🌐 Web Sitesine Git",
+                 command=self.siteye_git,
+                 bg=self.colors['success'],
+                 fg='white',
+                 font=self.fonts['normal'],
+                 relief=tk.FLAT,
+                 padx=15,
+                 pady=10,
+                 cursor='hand2').pack(side=tk.LEFT, padx=5)
     
     def create_newspaper_list_tab(self):
         """Gazete listesi tab'ı oluştur"""
@@ -825,7 +927,7 @@ Lisans: GPL-3.0
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except:
+            except Exception:
                 return {}
         return {}
     
@@ -908,7 +1010,7 @@ Lisans: GPL-3.0
         thread.start()
     
     def _bulk_download_worker(self, newspapers, start_date, end_date):
-        """Toplu indirme işlemi (worker thread)"""
+        """Toplu indirme işlemi (worker thread) - GasteArsivi.com CDN entegrasyonu"""
         try:
             total_days = (end_date - start_date).days + 1
             total_tasks = len(newspapers) * total_days
@@ -916,19 +1018,56 @@ Lisans: GPL-3.0
             
             self.log(f"İndirme başlatıldı: {len(newspapers)} yayın, {total_days} gün")
             
-            current_date = start_date
-            while current_date <= end_date:
+            for newspaper in newspapers:
                 if self.cancel_download:
-                    self.log("İndirme iptal edildi!")
                     break
                 
-                for newspaper in newspapers:
+                # GasteArsivi veritabanından gazete bilgisini al
+                if newspaper not in self.veri_havuzu:
+                    self.log(f"⚠ {newspaper} GasteArsivi veritabanında bulunamadı, atlanıyor...")
+                    completed_tasks += total_days
+                    continue
+                
+                newspaper_data = self.veri_havuzu[newspaper]
+                gid = newspaper_data["id"]
+                folder_name = newspaper_data["name"].replace("/", "-")
+                
+                # Yıl klasörü oluştur
+                yil_klasor = os.path.join(self.config['download_dir'], folder_name)
+                os.makedirs(yil_klasor, exist_ok=True)
+                
+                current_date = start_date
+                while current_date <= end_date:
                     if self.cancel_download:
                         break
                     
-                    # İndirme simülasyonu (gerçek implementasyon için API çağrıları yapılmalı)
-                    self.log(f"{newspaper} - {current_date.strftime('%d.%m.%Y')} indiriliyor...")
-                    time.sleep(0.1)  # Simülasyon gecikmesi
+                    tarih_str = current_date.strftime('%Y-%m-%d')
+                    
+                    # Yıl filtresi kontrolü
+                    if not self.yil_araligi_kontrol(newspaper_data["publication_dates"], current_date.year):
+                        self.log(f"Atlandı (yayın aralığı dışı): {newspaper} - {tarih_str}")
+                        completed_tasks += 1
+                        current_date += timedelta(days=1)
+                        continue
+                    
+                    # Mevcut PDF kontrolü
+                    pdf_path = os.path.join(yil_klasor, f"{folder_name}_{tarih_str}.pdf")
+                    if os.path.exists(pdf_path):
+                        self.log(f"Atlandı (mevcut): {tarih_str}")
+                        completed_tasks += 1
+                        progress = (completed_tasks / total_tasks) * 100
+                        self.update_progress(progress, f"{completed_tasks}/{total_tasks} işlem tamamlandı")
+                        current_date += timedelta(days=1)
+                        continue
+                    
+                    # İndir ve PDF oluştur
+                    self.log(f"{newspaper} - {tarih_str} indiriliyor...")
+                    success = self.indir_ve_pdf_olustur(gid, folder_name, tarih_str, yil_klasor)
+                    
+                    if success:
+                        self.log(f"✅ Tamamlandı: {newspaper} - {tarih_str}")
+                    else:
+                        self.log(f"⚠ Bulunamadı: {newspaper} - {tarih_str}")
                     
                     completed_tasks += 1
                     progress = (completed_tasks / total_tasks) * 100
@@ -936,13 +1075,16 @@ Lisans: GPL-3.0
                         progress,
                         f"{completed_tasks}/{total_tasks} işlem tamamlandı"
                     )
-                
-                current_date += timedelta(days=1)
+                    
+                    current_date += timedelta(days=1)
             
             if not self.cancel_download:
                 self.log("✅ İndirme tamamlandı!")
                 self.update_progress(100, "Tamamlandı")
                 messagebox.showinfo("Başarılı", "İndirme işlemi tamamlandı!")
+            
+            # Cache'i kaydet
+            self.cache_kaydet()
             
         except Exception as e:
             self.log(f"❌ Hata: {str(e)}")
@@ -960,26 +1102,94 @@ Lisans: GPL-3.0
             self.log("İndirme iptal ediliyor...")
     
     def download_from_link(self):
-        """Link'ten indirme yap"""
+        """Link'ten indirme yap - URL parsing ve otomatik indirme"""
         url = self.url_entry.get().strip()
         if not url:
             messagebox.showwarning("Uyarı", "Lütfen bir URL girin!")
             return
         
         self.log(f"Link'ten indirme: {url}")
-        # Gerçek implementasyon burada yapılmalı
-        messagebox.showinfo("Bilgi", "Link indirme özelliği yakında eklenecek!")
+        
+        # URL'den bilgileri parse et
+        match = re.search(r"gazete\/([^\/]+)\/(\d{4}-\d{2}-\d{2})\/?(\d+)?", url)
+        if not match:
+            messagebox.showerror("Hata", "Geçersiz URL formatı!\nÖrnek: https://www.gastearsivi.com/gazete/cumhuriyet/2020-01-15/1")
+            return
+        
+        gid = match.group(1)
+        tarih = match.group(2)
+        page = match.group(3) if match.group(3) else "1"
+        
+        # Gazete adını bul
+        gname = None
+        for item in self.raw_data:
+            if item["id"] == gid:
+                gname = item["name"]
+                break
+        
+        if not gname:
+            gname = gid
+        
+        self.log(f"Gazete: {gname}, Tarih: {tarih}, Sayfa: {page}")
+        
+        # Tek sayfa mı yoksa tüm sayılar mı?
+        result = messagebox.askyesnocancel(
+            "İndirme Seçeneği",
+            f"Sadece sayfa {page} indirilsin mi?\n\n"
+            f"Evet: Sadece bu sayfayı indir\n"
+            f"Hayır: Tüm sayfaları indir ve PDF oluştur\n"
+            f"İptal: İşlemi iptal et"
+        )
+        
+        if result is None:  # Cancel
+            return
+        elif result:  # Yes - tek sayfa
+            thread = threading.Thread(
+                target=lambda: self.tek_sayfa_indir(gid, gname, tarih, page),
+                daemon=True
+            )
+            thread.start()
+        else:  # No - tüm sayfalar
+            folder_name = gname.replace("/", "-")
+            yil_klasor = os.path.join(self.config['download_dir'], folder_name)
+            os.makedirs(yil_klasor, exist_ok=True)
+            
+            thread = threading.Thread(
+                target=lambda: self.indir_ve_pdf_olustur(gid, folder_name, tarih, yil_klasor),
+                daemon=True
+            )
+            thread.start()
     
     def find_same_date_newspapers(self):
-        """Aynı tarihteki diğer gazeteleri bul"""
+        """Aynı tarihteki diğer gazeteleri bul - gerçek implementasyon"""
         url = self.url_entry.get().strip()
         if not url:
             messagebox.showwarning("Uyarı", "Lütfen bir URL girin!")
             return
         
-        self.log(f"Aynı tarihteki gazeteler aranıyor: {url}")
-        # Gerçek implementasyon burada yapılmalı
-        messagebox.showinfo("Bilgi", "Arama özelliği yakında eklenecek!")
+        # URL'den tarihi parse et
+        match = re.search(r"gazete\/([^\/]+)\/(\d{4}-\d{2}-\d{2})", url)
+        if not match:
+            messagebox.showerror("Hata", "Geçersiz URL formatı!")
+            return
+        
+        tarih_str = match.group(2)
+        self.log(f"Aynı tarihteki gazeteler aranıyor: {tarih_str}")
+        
+        # Thread ile ara
+        def arama_worker():
+            bulunan = self.gunu_tara(tarih_str)
+            if bulunan:
+                mesaj = f"{tarih_str} tarihinde {len(bulunan)} gazete bulundu:\n\n"
+                mesaj += "\n".join(f"• {g}" for g in bulunan)
+                self.root.after(0, lambda: messagebox.showinfo("Sonuçlar", mesaj))
+                self.log(f"✅ {len(bulunan)} gazete bulundu")
+            else:
+                self.root.after(0, lambda: messagebox.showinfo("Sonuç", "Bu tarihte gazete bulunamadı."))
+                self.log("⚠ Gazete bulunamadı")
+        
+        thread = threading.Thread(target=arama_worker, daemon=True)
+        thread.start()
     
     def filter_newspaper_list(self, event=None):
         """Gazete listesini filtrele"""
@@ -1018,13 +1228,10 @@ Lisans: GPL-3.0
             self.log(f"İndirme dizini değiştirildi: {new_dir}")
     
     def open_download_dir(self):
-        """İndirme dizinini aç"""
+        """İndirme dizinini aç - platform bağımsız"""
         download_dir = self.config.get('download_dir', '')
         if download_dir and Path(download_dir).exists():
-            try:
-                subprocess.run(['xdg-open', download_dir], check=True)
-            except:
-                messagebox.showerror("Hata", "Dizin açılamadı!")
+            self.dosya_ac(download_dir)
         else:
             messagebox.showwarning("Uyarı", "İndirme dizini bulunamadı!")
     
@@ -1040,7 +1247,7 @@ Lisans: GPL-3.0
             # MB cinsinden
             size_mb = total_size / (1024 * 1024)
             return f"{size_mb:.2f} MB"
-        except:
+        except Exception:
             return "0 MB"
     
     def clear_cache(self):
@@ -1063,6 +1270,182 @@ Lisans: GPL-3.0
             except Exception as e:
                 self.log(f"❌ Önbellek temizleme hatası: {str(e)}")
                 messagebox.showerror("Hata", f"Önbellek temizlenemedi:\n{str(e)}")
+    
+    def cache_yukle(self):
+        """Önbellek dosyasını yükle"""
+        if self.cache_file.exists():
+            try:
+                with open(self.cache_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+    
+    def cache_kaydet(self):
+        """Önbelleği kaydet"""
+        try:
+            with open(self.cache_file, 'w', encoding='utf-8') as f:
+                json.dump(self.tarama_onbellegi, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            self.log(f"Önbellek kaydetme hatası: {str(e)}")
+    
+    def yil_araligi_kontrol(self, tarih_metni, hedef_yil):
+        """Yayın tarihlerine göre filtreleme"""
+        try:
+            hedef_yil = int(hedef_yil)
+            bitis_limit = datetime.now().year if "Günümüz" in tarih_metni else 0
+            yillar = [int(y) for y in re.findall(r'\d{4}', tarih_metni)]
+            
+            if not yillar:
+                return True
+            
+            baslangic = min(yillar)
+            bitis = bitis_limit if bitis_limit > 0 else max(yillar)
+            
+            return (baslangic - 1) <= hedef_yil <= (bitis + 1)
+        except (ValueError, TypeError, AttributeError):
+            return True
+    
+    def dosya_ac(self, path):
+        """Platform bağımsız dosya açma"""
+        system = platform.system()
+        try:
+            if system == 'Windows':
+                os.startfile(path)
+            elif system == 'Darwin':  # macOS
+                subprocess.call(['open', path])
+            else:  # Linux
+                subprocess.call(['xdg-open', path])
+        except Exception as e:
+            self.log(f"Dosya açma hatası: {str(e)}")
+            messagebox.showerror("Hata", f"Dosya açılamadı:\n{str(e)}")
+    
+    def yasal_uyari_goster(self):
+        """Yasal uyarı dialogunu göster"""
+        messagebox.showinfo("Yasal Uyarı", self.yasal_metin)
+    
+    def get_selected_newspaper(self):
+        """Seçili gazeteyi al (listbox'tan)"""
+        selected_indices = self.newspaper_listbox.curselection()
+        if selected_indices:
+            return self.newspaper_listbox.get(selected_indices[0])
+        return None
+    
+    def siteye_git(self):
+        """Seçili gazete için gastearsivi.com'a yönlendir"""
+        # URL alanından parse et
+        url = self.url_entry.get().strip()
+        if url:
+            # Eğer URL varsa direkt aç
+            webbrowser.open(url)
+            self.log(f"Web sitesi açılıyor: {url}")
+            return
+        
+        # Yoksa seçili gazeteden oluştur
+        secilen = self.get_selected_newspaper()
+        if not secilen or secilen not in self.veri_havuzu:
+            messagebox.showwarning("Uyarı", "Lütfen bir gazete seçin veya URL girin!")
+            return
+        
+        gid = self.veri_havuzu[secilen]["id"]
+        yil = self.start_year.get()
+        ay = self.start_month.get()
+        gun = self.start_day.get()
+        url = f"https://www.gastearsivi.com/gazete/{gid}/{yil}-{ay.zfill(2)}-{gun.zfill(2)}/1"
+        webbrowser.open(url)
+        self.log(f"Web sitesi açılıyor: {url}")
+    
+    def gunu_tara(self, tarih_str):
+        """Aynı tarihteki gazeteleri bul (gerçek implementasyon)"""
+        bulunan = []
+        self.log(f"Taranan tarih: {tarih_str}")
+        
+        for item in self.raw_data:
+            if self.cancel_download:
+                break
+                
+            gid = item["id"]
+            url = f"https://dzp35pmd4yqn4.cloudfront.net/sayfalar/{gid}/{tarih_str}-1.jpg"
+            try:
+                r = requests.head(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=2)
+                if r.status_code == 200:
+                    bulunan.append(item["name"])
+                    self.log(f"✓ Bulundu: {item['name']}")
+            except (requests.RequestException, ConnectionError, TimeoutError):
+                pass
+        
+        return bulunan
+    
+    def tek_sayfa_indir(self, gid, gname, tarih, sayfa):
+        """Tek sayfa indirme"""
+        folder = os.path.join(self.config['download_dir'], "Tekil_Indirmeler")
+        os.makedirs(folder, exist_ok=True)
+        
+        url = f"https://dzp35pmd4yqn4.cloudfront.net/sayfalar/{gid}/{tarih}-{sayfa}.jpg"
+        local = os.path.join(folder, f"{gname}_{tarih}_Sayfa{sayfa}.jpg")
+        
+        try:
+            self.log(f"Tek sayfa indiriliyor: {gname} - {tarih} - Sayfa {sayfa}")
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            if r.status_code == 200:
+                with open(local, "wb") as f:
+                    f.write(r.content)
+                self.log(f"✅ İndirildi: {local}")
+                messagebox.showinfo("Başarılı", f"Sayfa indirildi:\n{local}")
+                return True
+            else:
+                messagebox.showerror("Hata", f"Sayfa bulunamadı (HTTP {r.status_code})")
+                return False
+        except Exception as e:
+            self.log(f"❌ Hata: {str(e)}")
+            messagebox.showerror("Hata", f"İndirme hatası:\n{str(e)}")
+            return False
+    
+    def indir_ve_pdf_olustur(self, gid, folder_name, tarih_str, yil_klasor):
+        """CDN'den resim indir ve PDF oluştur"""
+        temp = os.path.join(yil_klasor, "temp")
+        os.makedirs(temp, exist_ok=True)
+        
+        sayfa = 1
+        images = []
+        tolerance = 0
+        base_cdn = "https://dzp35pmd4yqn4.cloudfront.net/sayfalar"
+        
+        while sayfa <= 99:
+            if self.cancel_download or tolerance >= 2:
+                break
+            
+            url = f"{base_cdn}/{gid}/{tarih_str}-{sayfa}.jpg"
+            try:
+                r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+                if r.status_code == 200:
+                    fpath = os.path.join(temp, f"{sayfa}.jpg")
+                    with open(fpath, "wb") as f:
+                        f.write(r.content)
+                    images.append(fpath)
+                    tolerance = 0
+                    self.log(f"  Sayfa {sayfa} indirildi")
+                    time.sleep(0.5)
+                else:
+                    tolerance += 1
+            except (requests.RequestException, ConnectionError, IOError):
+                tolerance += 1
+            sayfa += 1
+        
+        if images:
+            try:
+                pdf_path = os.path.join(yil_klasor, f"{folder_name}_{tarih_str}.pdf")
+                img_list = [Image.open(x).convert("RGB") for x in images]
+                if img_list:  # Double check list is not empty
+                    img_list[0].save(pdf_path, save_all=True, append_images=img_list[1:] if len(img_list) > 1 else [])
+                    for img in img_list:
+                        img.close()
+                    self.log(f"✅ PDF oluşturuldu: {pdf_path}")
+            except Exception as e:
+                self.log(f"❌ PDF oluşturma hatası: {str(e)}")
+        
+        shutil.rmtree(temp, ignore_errors=True)
+        return len(images) > 0
 
 
 def main():
