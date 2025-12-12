@@ -260,7 +260,7 @@ _(Ekran görüntüleri eklenecek)_
 
 - Python 3.8+
 - Tkinter
-- Pillow >= 9.0.0
+- Pillow >= 10.2.0
 - requests >= 2.28.0
 
 ### Katkıda Bulunma
