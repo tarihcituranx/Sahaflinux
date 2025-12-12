@@ -927,7 +927,7 @@ Lisans: GPL-3.0
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except:
+            except Exception:
                 return {}
         return {}
     
@@ -1247,7 +1247,7 @@ Lisans: GPL-3.0
             # MB cinsinden
             size_mb = total_size / (1024 * 1024)
             return f"{size_mb:.2f} MB"
-        except:
+        except Exception:
             return "0 MB"
     
     def clear_cache(self):
@@ -1277,7 +1277,7 @@ Lisans: GPL-3.0
             try:
                 with open(self.cache_file, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except:
+            except Exception:
                 return {}
         return {}
     
