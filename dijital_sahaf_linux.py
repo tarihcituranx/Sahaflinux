@@ -282,6 +282,11 @@ GAZETE_DATABASE = {
         "url_pattern": "https://tarihvedusunce.com/arsiv/{year}/{month:02d}",
         "type": "dergi",
         "years": (2000, 2024)
+    },
+    "Cogito": {
+        "url_pattern": "https://www.cogitodergi.com/arsiv/{year}/{month:02d}",
+        "type": "dergi",
+        "years": (1995, 2024)
     }
 }
 
