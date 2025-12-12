@@ -187,7 +187,7 @@ install_python_dependencies() {
         pip3 install --user -r requirements.txt || error_exit "Python bağımlılıkları kurulamadı!"
     else
         echo -e "${BLUE}📦 Manuel bağımlılık kurulumu yapılıyor...${NC}"
-        pip3 install --user requests>=2.28.0 Pillow>=9.0.0 || error_exit "Python bağımlılıkları kurulamadı!"
+        pip3 install --user requests>=2.28.0 Pillow>=10.2.0 || error_exit "Python bağımlılıkları kurulamadı!"
     fi
     
     success "Python bağımlılıkları kuruldu"

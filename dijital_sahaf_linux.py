@@ -1029,7 +1029,7 @@ Lisans: GPL-3.0
             total_size = 0
             for dirpath, dirnames, filenames in os.walk(CACHE_DIR):
                 for filename in filenames:
-                    filepath = os.path.join(dirpath, filenames)
+                    filepath = os.path.join(dirpath, filename)
                     total_size += os.path.getsize(filepath)
             
             # MB cinsinden
