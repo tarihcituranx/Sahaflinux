@@ -1303,7 +1303,7 @@ Lisans: GPL-3.0
             bitis = bitis_limit if bitis_limit > 0 else max(yillar)
             
             return (baslangic - 1) <= hedef_yil <= (bitis + 1)
-        except:
+        except (ValueError, TypeError, AttributeError):
             return True
     
     def dosya_ac(self, path):
@@ -1371,7 +1371,7 @@ Lisans: GPL-3.0
                 if r.status_code == 200:
                     bulunan.append(item["name"])
                     self.log(f"✓ Bulundu: {item['name']}")
-            except:
+            except (requests.RequestException, ConnectionError, TimeoutError):
                 pass
         
         return bulunan
@@ -1428,7 +1428,7 @@ Lisans: GPL-3.0
                     time.sleep(0.5)
                 else:
                     tolerance += 1
-            except:
+            except (requests.RequestException, ConnectionError, IOError):
                 tolerance += 1
             sayfa += 1
         
@@ -1436,10 +1436,11 @@ Lisans: GPL-3.0
             try:
                 pdf_path = os.path.join(yil_klasor, f"{folder_name}_{tarih_str}.pdf")
                 img_list = [Image.open(x).convert("RGB") for x in images]
-                img_list[0].save(pdf_path, save_all=True, append_images=img_list[1:])
-                for img in img_list:
-                    img.close()
-                self.log(f"✅ PDF oluşturuldu: {pdf_path}")
+                if img_list:  # Double check list is not empty
+                    img_list[0].save(pdf_path, save_all=True, append_images=img_list[1:] if len(img_list) > 1 else [])
+                    for img in img_list:
+                        img.close()
+                    self.log(f"✅ PDF oluşturuldu: {pdf_path}")
             except Exception as e:
                 self.log(f"❌ PDF oluşturma hatası: {str(e)}")
         
