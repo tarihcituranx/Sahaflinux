@@ -2,4 +2,3 @@ streamlit
 requests
 Pillow
 pytesseract
-tesseract-ocr
