@@ -15,13 +15,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# OCR Kütüphanesi Kontrolü
-try:
-    import pytesseract
-    OCR_AVAILABLE = True
-except ImportError:
-    OCR_AVAILABLE = False
-
 # --- VERİ TABANI ---
 GASTE_ARSIVI_DATABASE = [
     {"id": "aksam", "name": "Akşam", "dates": "1918-Günümüz"},
@@ -83,24 +76,19 @@ def get_page_image(gid, date_str, page_num):
     return None
 
 def check_daily_availability(check_date):
-    """Verilen tarihte hangi gazetelerin çıktığını hızlıca tarar"""
     available_papers = []
     date_str = check_date.strftime("%Y-%m-%d")
-    
     progress_bar = st.progress(0)
     total = len(GASTE_ARSIVI_DATABASE)
-    
     for idx, paper in enumerate(GASTE_ARSIVI_DATABASE):
-        # HTTP HEAD isteği atarak dosya var mı kontrol et (Resmi indirmeden)
         url = f"https://dzp35pmd4yqn4.cloudfront.net/sayfalar/{paper['id']}/{date_str}-1.jpg"
         try:
-            r = requests.head(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=1)
+            r = requests.head(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=0.5)
             if r.status_code == 200:
                 available_papers.append(paper['name'])
         except:
             pass
         progress_bar.progress((idx + 1) / total)
-        
     progress_bar.empty()
     return available_papers
 
@@ -215,11 +203,10 @@ compress = st.sidebar.checkbox("PDF Sıkıştırma", value=True)
 pdf_settings = {"compress": compress, "ocr": False}
 
 # --- SEKME YAPISI ---
-tab_app, tab_guide, tab_notes = st.tabs(["🚀 Uygulama", "📖 Kılavuz", "📝 Notlar"])
+tab_app, tab_guide, tab_notes = st.tabs(["🚀 Uygulama", "📖 Kılavuz & İpuçları", "📝 Sürüm Notları"])
 
 # --- TAB 1: UYGULAMA ---
 with tab_app:
-    
     # ---------------------------
     # MOD: KIYASLAMA (COMPARISON)
     # ---------------------------
@@ -312,8 +299,8 @@ with tab_app:
                     st.image("https://placehold.co/400x600?text=Arsiv+Yok", use_container_width=True)
                     preview_ok = False
                 
-                # --- YAYIN RADARI (YENİ ÖZELLİK) ---
-                with st.expander("📡 Bu Tarihteki Diğer Yayınlar"):
+                # YAYIN RADARI
+                with st.expander("📡 Bu Tarihteki Diğer Yayınlar (Radar)"):
                     st.caption("Seçili tarihte çıkan diğer gazeteleri tarar.")
                     if st.button("Taramayı Başlat"):
                         available = check_daily_availability(selected_date_start)
@@ -370,15 +357,49 @@ with tab_app:
 
 # --- TAB 2: KILAVUZ ---
 with tab_guide:
-    st.markdown("""
-    ### 🆚 Kıyaslama Modu
-    Tarihsel olayları analiz etmek için sol menüden **'Manşet Kıyaslama'** modunu seçin. İki farklı gazeteyi yan yana açıp aynı tarihteki manşetlerini karşılaştırabilir ve ayrı ayrı indirebilirsiniz.
+    st.header("📖 Dijital Sahaf Kullanım Kılavuzu")
     
-    ### 📡 Yayın Radarı
-    Bir gazetenin önizleme ekranının altında **'Bu Tarihteki Diğer Yayınlar'** panelini açıp tarama yaparsanız, sistem o gün veritabanında mevcut olan diğer tüm gazeteleri listeler.
+    st.markdown("""
+    ### 1. Navigasyon (Sol Menü)
+    * **Katalogdan Seç:** Sistemde tanımlı gazeteleri (Cumhuriyet, Tan, Akşam vb.) listeden seçerek ilerlersiniz.
+    * **Link ile İndir:** GasteArşivi sitesindeki bir linki yapıştırarak direkt o sayıya gidersiniz.
+    * **Manşet Kıyaslama:** Aynı tarihteki iki farklı gazeteyi yan yana açıp karşılaştırmanızı sağlar.
+
+    ### 2. Görüntü Laboratuvarı (Image Lab)
+    Eski ve silik gazeteleri okunabilir hale getirmek için filtreleri kullanın:
+    * **Kontrast:** Yazıları koyulaştırır, kağıt lekesini siler.
+    * **Parlaklık:** Çok koyu (kömürleşmiş) taramaları açar.
+    * **Siyah-Beyaz Modu:** Arka planı tamamen beyazlatır, sadece yazıyı bırakır (Önerilen).
+    * **Negatif Mod:** Gece okumaları için renkleri ters çevirir.
+
+    ### 3. Toplu İndirme ve ZIP
+    * Sol menüden **"Tarih Aralığı (Toplu ZIP)"** seçeneğini seçin.
+    * Başlangıç ve Bitiş tarihlerini girin (Örn: 1-30 Ocak 1930).
+    * **"Aralığı ZIP Yap"** kutusunu işaretleyin.
+    * İndir butonuna bastığınızda sistem tüm günleri tarar ve tek bir dosya verir.
+
+    ### 4. Yayın Radarı
+    * Bir gazeteyi görüntülerken, alt kısımdaki **"Bu Tarihteki Diğer Yayınlar"** panelini açın.
+    * "Taramayı Başlat" dediğinizde, sistem o gün yayınlanan diğer tüm gazeteleri sizin için bulur.
     """)
 
 # --- TAB 3: NOTLAR ---
 with tab_notes:
-    st.info("v20.0 - Platinum Edition")
-    st.markdown("* Manşet Kıyaslama Modu eklendi.\n* Günlük Yayın Tarayıcı (Radar) eklendi.\n* APA Citation Engine güncellendi.")
+    st.header("📝 Sürüm Notları")
+    
+    st.info("Mevcut Sürüm: **v20.1 (Stable - Docs Edition)**")
+    
+    st.markdown("""
+    #### v20.1
+    * 🐛 Sekme yapısındaki kayma sorunu düzeltildi.
+    * 📖 Kullanım Kılavuzu sekmesi detaylandırıldı.
+    
+    #### v20.0 - Platinum Edition
+    * ✅ **Manşet Kıyaslama Modu:** İki gazete yan yana analiz edilebilir.
+    * ✅ **Yayın Radarı:** Tarih bazlı çapraz tarama özelliği eklendi.
+    * ✅ **Akıllı ZIP:** Çoklu dosya indirmelerinde otomatik paketleme.
+    
+    #### v19.0 - Akademik Araştırma
+    * ✅ **APA Atıf Motoru:** Otomatik kaynakça oluşturma.
+    * ✅ **Görüntü İşleme:** Kontrast ve Siyah-Beyaz filtreleri.
+    """)
