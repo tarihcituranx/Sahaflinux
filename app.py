@@ -40,7 +40,9 @@ GASTE_ARSIVI_DATABASE = [
     {"id": "tasviri-efkar", "name": "Tasviri Efkar", "dates": "1862-1871"},
     {"id": "tercuman-i-ahval", "name": "Tercüman-ı Ahval", "dates": "1860-1866"},
     {"id": "resimli-ay", "name": "Resimli Ay", "dates": "1924-1938"},
-    {"id": "yarin", "name": "Yarın", "dates": "1929-1931"}
+    {"id": "yarin", "name": "Yarın", "dates": "1929-1931"},
+    {"id": "akbaba", "name": "Akbaba", "dates": "1922-1977"},
+    {"id": "hakimiyeti_milliye", "name": "Hakimiyet-i Milliye", "dates": "1920-1934"}
 ]
 GASTE_ARSIVI_DATABASE.sort(key=lambda x: x["name"])
 
@@ -73,12 +75,34 @@ def apply_image_filters(image, contrast, brightness, sharpness, invert, grayscal
 def get_page_image(gid, date_str, page_num):
     url = f"https://dzp35pmd4yqn4.cloudfront.net/sayfalar/{gid}/{date_str}-{page_num}.jpg"
     try:
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=3)
         if r.status_code == 200:
             return Image.open(BytesIO(r.content))
     except:
         pass
     return None
+
+def check_daily_availability(check_date):
+    """Verilen tarihte hangi gazetelerin çıktığını hızlıca tarar"""
+    available_papers = []
+    date_str = check_date.strftime("%Y-%m-%d")
+    
+    progress_bar = st.progress(0)
+    total = len(GASTE_ARSIVI_DATABASE)
+    
+    for idx, paper in enumerate(GASTE_ARSIVI_DATABASE):
+        # HTTP HEAD isteği atarak dosya var mı kontrol et (Resmi indirmeden)
+        url = f"https://dzp35pmd4yqn4.cloudfront.net/sayfalar/{paper['id']}/{date_str}-1.jpg"
+        try:
+            r = requests.head(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=1)
+            if r.status_code == 200:
+                available_papers.append(paper['name'])
+        except:
+            pass
+        progress_bar.progress((idx + 1) / total)
+        
+    progress_bar.empty()
+    return available_papers
 
 def generate_apa_citation(name, date_obj, range_end=None):
     tr_months = {
@@ -151,97 +175,131 @@ def process_archive_single(gid, name, date_obj, img_settings, pdf_settings, prog
 # YAN MENÜ (GLOBAL AYARLAR)
 st.sidebar.title("🛠️ Kontrol Paneli")
 
-nav_mode = st.sidebar.radio("Navigasyon Modu", ["📖 Katalogdan Seç", "🔗 Link ile İndir"])
+nav_mode = st.sidebar.radio(
+    "Çalışma Modu", 
+    ["📖 Katalogdan Seç", "🔗 Link ile İndir", "🆚 Manşet Kıyaslama"]
+)
 st.sidebar.markdown("---")
 
-st.sidebar.subheader("📅 Tarih Modu")
-date_mode = st.sidebar.radio("İndirme Tipi", ["Tek Gün", "Tarih Aralığı (Toplu ZIP)"])
-
+# TARİH & GÖRÜNTÜ AYARLARI (MODA GÖRE DEĞİŞİR)
 selected_date_start = None
 selected_date_end = None
+date_mode = "Tek Gün"
 
-if date_mode == "Tek Gün":
-    selected_date_start = st.sidebar.date_input("Tarih", date(1930, 1, 1), min_value=date(1800, 1, 1), max_value=date.today())
+if nav_mode == "🆚 Manşet Kıyaslama":
+    st.sidebar.info("Kıyaslama modunda tarih ortaktır.")
+    selected_date_start = st.sidebar.date_input("Kıyaslama Tarihi", date(1930, 1, 1), min_value=date(1800, 1, 1))
     selected_date_end = selected_date_start
-else:
-    st.sidebar.info("Başlangıç ve Bitiş tarihlerini seçin.")
-    col_d1, col_d2 = st.sidebar.columns(2)
-    with col_d1:
-        selected_date_start = st.date_input("Başlangıç", date(1930, 1, 1), min_value=date(1800, 1, 1))
-    with col_d2:
-        selected_date_end = st.date_input("Bitiş", date(1930, 1, 7), min_value=date(1800, 1, 1))
+elif nav_mode == "📖 Katalogdan Seç":
+    st.sidebar.subheader("📅 Tarih Modu")
+    date_mode = st.sidebar.radio("İndirme Tipi", ["Tek Gün", "Tarih Aralığı (Toplu ZIP)"])
+    if date_mode == "Tek Gün":
+        selected_date_start = st.sidebar.date_input("Tarih", date(1930, 1, 1), min_value=date(1800, 1, 1))
+        selected_date_end = selected_date_start
+    else:
+        col_d1, col_d2 = st.sidebar.columns(2)
+        with col_d1: selected_date_start = st.date_input("Başlangıç", date(1930, 1, 1))
+        with col_d2: selected_date_end = st.date_input("Bitiş", date(1930, 1, 7))
 
 st.sidebar.markdown("---")
-
 st.sidebar.subheader("🎨 Görüntü Laboratuvarı")
 contrast = st.sidebar.slider("Kontrast", 0.5, 2.0, 1.0, 0.1)
 brightness = st.sidebar.slider("Parlaklık", 0.5, 2.0, 1.0, 0.1)
 grayscale = st.sidebar.checkbox("Siyah-Beyaz Modu", value=False)
 invert = st.sidebar.checkbox("Negatif (Gece) Modu", value=False)
 
-img_settings = {
-    "contrast": contrast,
-    "brightness": brightness,
-    "sharpness": 1.0,
-    "grayscale": grayscale,
-    "invert": invert
-}
+img_settings = {"contrast": contrast, "brightness": brightness, "sharpness": 1.0, "grayscale": grayscale, "invert": invert}
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("💾 Çıktı")
-compress = st.sidebar.checkbox("PDF Sıkıştırma (Optimize)", value=True)
-create_zip = st.sidebar.checkbox("📂 Aralığı ZIP Yap", value=True, disabled=(date_mode=="Tek Gün"))
-
-pdf_settings = {
-    "compress": compress,
-    "ocr": False
-}
+compress = st.sidebar.checkbox("PDF Sıkıştırma", value=True)
+pdf_settings = {"compress": compress, "ocr": False}
 
 # --- SEKME YAPISI ---
-tab_app, tab_guide, tab_notes = st.tabs(["🚀 Uygulama", "📖 Kullanma Kılavuzu", "📝 Güncelleme Notları"])
+tab_app, tab_guide, tab_notes = st.tabs(["🚀 Uygulama", "📖 Kılavuz", "📝 Notlar"])
 
-# --- TAB 1: UYGULAMA (ANA MODÜL) ---
+# --- TAB 1: UYGULAMA ---
 with tab_app:
-    gid = None
-    selected_name = ""
-
-    if nav_mode == "📖 Katalogdan Seç":
-        st.title("🎓 Dijital Sahaf: Akademik Arşiv")
-        selected_name = st.selectbox("Yayın Seçiniz", [i["name"] for i in GASTE_ARSIVI_DATABASE])
-        item_data = next(i for i in GASTE_ARSIVI_DATABASE if i["name"] == selected_name)
-        gid = item_data["id"]
-    else:
-        st.title("🔗 Link Çözücü")
-        url_input = st.text_input("GasteArsivi Linki")
-        if url_input:
-            match = re.search(r"gazete\/([^\/]+)\/(\d{4}-\d{2}-\d{2})", url_input)
-            if match:
-                gid = match.group(1)
-                date_str = match.group(2)
-                y, m, d = map(int, date_str.split('-'))
-                selected_date_start = date(y, m, d)
-                selected_date_end = selected_date_start
-                date_mode = "Tek Gün"
-                found_name = next((i["name"] for i in GASTE_ARSIVI_DATABASE if i["id"] == gid), gid)
-                selected_name = found_name
-                st.success(f"Link Algılandı: {selected_name}")
-
-    if gid and selected_date_start:
-        st.markdown("---")
-        delta = selected_date_end - selected_date_start
-        total_days = delta.days + 1
+    
+    # ---------------------------
+    # MOD: KIYASLAMA (COMPARISON)
+    # ---------------------------
+    if nav_mode == "🆚 Manşet Kıyaslama":
+        st.title("🆚 Manşet Kıyaslama Masası")
+        st.caption(f"Seçili Tarih: {selected_date_start.strftime('%d.%m.%Y')}")
         
-        if total_days < 1:
-            st.error("Bitiş tarihi başlangıçtan önce olamaz!")
-            st.stop()
-
-        col_preview, col_action = st.columns([1, 2])
+        col_left, col_right = st.columns(2)
         
-        with col_preview:
-            st.subheader("🔍 Referans Önizleme")
-            st.caption(f"Tarih: {selected_date_start}")
+        # SOL GAZETE
+        with col_left:
+            st.subheader("Yayın A (Sol)")
+            paper_a = st.selectbox("1. Gazeteyi Seç", [i["name"] for i in GASTE_ARSIVI_DATABASE], index=0)
+            gid_a = next(i["id"] for i in GASTE_ARSIVI_DATABASE if i["name"] == paper_a)
             
-            with st.spinner("Görüntü alınıyor..."):
+            with st.spinner(f"{paper_a} yükleniyor..."):
+                img_a = get_page_image(gid_a, selected_date_start.strftime("%Y-%m-%d"), 1)
+                if img_a:
+                    proc_a = apply_image_filters(img_a, contrast, brightness, 1.0, invert, grayscale)
+                    st.image(proc_a, caption=f"{paper_a} Manşet", use_container_width=True)
+                    if st.button(f"📥 {paper_a} İndir", key="dl_a"):
+                        pdf = process_archive_single(gid_a, paper_a, selected_date_start, img_settings, pdf_settings)
+                        if pdf: st.download_button("Kaydet", pdf, f"{paper_a}.pdf", "application/pdf")
+                else:
+                    st.error("Yayın Bulunamadı")
+                    st.image("https://placehold.co/400x600?text=Yok", use_container_width=True)
+
+        # SAĞ GAZETE
+        with col_right:
+            st.subheader("Yayın B (Sağ)")
+            paper_b = st.selectbox("2. Gazeteyi Seç", [i["name"] for i in GASTE_ARSIVI_DATABASE], index=1)
+            gid_b = next(i["id"] for i in GASTE_ARSIVI_DATABASE if i["name"] == paper_b)
+            
+            with st.spinner(f"{paper_b} yükleniyor..."):
+                img_b = get_page_image(gid_b, selected_date_start.strftime("%Y-%m-%d"), 1)
+                if img_b:
+                    proc_b = apply_image_filters(img_b, contrast, brightness, 1.0, invert, grayscale)
+                    st.image(proc_b, caption=f"{paper_b} Manşet", use_container_width=True)
+                    if st.button(f"📥 {paper_b} İndir", key="dl_b"):
+                        pdf = process_archive_single(gid_b, paper_b, selected_date_start, img_settings, pdf_settings)
+                        if pdf: st.download_button("Kaydet", pdf, f"{paper_b}.pdf", "application/pdf")
+                else:
+                    st.error("Yayın Bulunamadı")
+                    st.image("https://placehold.co/400x600?text=Yok", use_container_width=True)
+
+    # ---------------------------
+    # MOD: KATALOG & LINK
+    # ---------------------------
+    else:
+        gid = None
+        selected_name = ""
+
+        if nav_mode == "📖 Katalogdan Seç":
+            st.title("🎓 Dijital Sahaf: Akademik Arşiv")
+            selected_name = st.selectbox("Yayın Seçiniz", [i["name"] for i in GASTE_ARSIVI_DATABASE])
+            item_data = next(i for i in GASTE_ARSIVI_DATABASE if i["name"] == selected_name)
+            gid = item_data["id"]
+        else:
+            st.title("🔗 Link Çözücü")
+            url_input = st.text_input("GasteArsivi Linki")
+            if url_input:
+                match = re.search(r"gazete\/([^\/]+)\/(\d{4}-\d{2}-\d{2})", url_input)
+                if match:
+                    gid = match.group(1)
+                    selected_date_start = date(*map(int, match.group(2).split('-')))
+                    selected_date_end = selected_date_start
+                    date_mode = "Tek Gün"
+                    found_name = next((i["name"] for i in GASTE_ARSIVI_DATABASE if i["id"] == gid), gid)
+                    selected_name = found_name
+                    st.success(f"Link Algılandı: {selected_name}")
+
+        if gid and selected_date_start:
+            st.markdown("---")
+            delta = selected_date_end - selected_date_start
+            total_days = delta.days + 1
+            
+            col_preview, col_action = st.columns([1, 2])
+            
+            with col_preview:
+                st.subheader("🔍 Referans Önizleme")
                 date_str = selected_date_start.strftime("%Y-%m-%d")
                 raw_preview = get_page_image(gid, date_str, 1)
                 
@@ -253,99 +311,74 @@ with tab_app:
                     st.warning("Başlangıç tarihinde yayın yok.")
                     st.image("https://placehold.co/400x600?text=Arsiv+Yok", use_container_width=True)
                     preview_ok = False
-
-        with col_action:
-            st.subheader("⚙️ İşlem Merkezi")
-            st.info(f"**Yayın:** {selected_name} | **Aralık:** {total_days} Gün")
-            
-            with st.expander("🎓 APA Kaynakça (Kopyala)", expanded=True):
-                apa_text = generate_apa_citation(selected_name, selected_date_start, selected_date_end if total_days > 1 else None)
-                st.code(apa_text, language="text")
-
-            if preview_ok or total_days > 1:
-                btn_label = f"🚀 {total_days} Günlük Arşivi İndir" if total_days > 1 else "🚀 PDF İndir"
                 
-                if st.button(btn_label, type="primary"):
-                    progress_bar = st.progress(0)
-                    status_area = st.empty()
-                    generated_files = [] 
-                    
-                    for i in range(total_days):
-                        current_date = selected_date_start + timedelta(days=i)
-                        status_area.text(f"İşleniyor: {current_date.strftime('%d.%m.%Y')} ({i+1}/{total_days})")
-                        progress_bar.progress((i) / total_days)
-                        
-                        pdf_data = process_archive_single(gid, selected_name, current_date, img_settings, pdf_settings)
-                        
-                        if pdf_data:
-                            fname = f"{selected_name.replace(' ', '_')}_{current_date.strftime('%Y-%m-%d')}.pdf"
-                            generated_files.append((fname, pdf_data))
-                    
-                    progress_bar.progress(1.0)
-                    status_area.success(f"Tamamlandı! {len(generated_files)} dosya hazır.")
-                    
-                    if len(generated_files) > 0:
-                        if len(generated_files) > 1 and create_zip:
-                            zip_buffer = BytesIO()
-                            with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zf:
-                                for fname, data in generated_files:
-                                    zf.writestr(fname, data.getvalue())
-                            zip_buffer.seek(0)
-                            zip_name = f"{selected_name}_Arsiv_{selected_date_start}_{selected_date_end}.zip"
-                            st.download_button(f"📦 ZIP İndir ({len(generated_files)} Dosya)", zip_buffer, file_name=zip_name, mime="application/zip")
+                # --- YAYIN RADARI (YENİ ÖZELLİK) ---
+                with st.expander("📡 Bu Tarihteki Diğer Yayınlar"):
+                    st.caption("Seçili tarihte çıkan diğer gazeteleri tarar.")
+                    if st.button("Taramayı Başlat"):
+                        available = check_daily_availability(selected_date_start)
+                        if available:
+                            st.success(f"{len(available)} yayın bulundu:")
+                            for p in available:
+                                st.write(f"• {p}")
                         else:
-                            for fname, data in generated_files:
-                                st.download_button(f"📄 {fname}", data, file_name=fname, mime="application/pdf", key=fname)
-                    else:
-                        st.warning("Hiçbir yayın bulunamadı.")
+                            st.warning("Başka yayın bulunamadı.")
 
-# --- TAB 2: KULLANMA KILAVUZU ---
+            with col_action:
+                st.subheader("⚙️ İşlem Merkezi")
+                st.info(f"**Yayın:** {selected_name} | **Aralık:** {total_days} Gün")
+                
+                with st.expander("🎓 APA Kaynakça", expanded=True):
+                    apa_text = generate_apa_citation(selected_name, selected_date_start, selected_date_end if total_days > 1 else None)
+                    st.code(apa_text, language="text")
+
+                if preview_ok or total_days > 1:
+                    btn_label = f"🚀 {total_days} Günlük Arşivi İndir" if total_days > 1 else "🚀 PDF İndir"
+                    create_zip = st.checkbox("📂 Aralığı ZIP Yap", value=True, disabled=(date_mode=="Tek Gün"), key="zip_main")
+                    
+                    if st.button(btn_label, type="primary"):
+                        progress_bar = st.progress(0)
+                        status_area = st.empty()
+                        generated_files = [] 
+                        
+                        for i in range(total_days):
+                            current_date = selected_date_start + timedelta(days=i)
+                            status_area.text(f"İşleniyor: {current_date.strftime('%d.%m.%Y')} ({i+1}/{total_days})")
+                            progress_bar.progress((i) / total_days)
+                            
+                            pdf_data = process_archive_single(gid, selected_name, current_date, img_settings, pdf_settings)
+                            if pdf_data:
+                                fname = f"{selected_name.replace(' ', '_')}_{current_date.strftime('%Y-%m-%d')}.pdf"
+                                generated_files.append((fname, pdf_data))
+                        
+                        progress_bar.progress(1.0)
+                        status_area.success(f"Tamamlandı! {len(generated_files)} dosya hazır.")
+                        
+                        if len(generated_files) > 0:
+                            if len(generated_files) > 1 and create_zip:
+                                zip_buffer = BytesIO()
+                                with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zf:
+                                    for fname, data in generated_files:
+                                        zf.writestr(fname, data.getvalue())
+                                zip_buffer.seek(0)
+                                st.download_button(f"📦 ZIP İndir", zip_buffer, f"{selected_name}_Arsiv.zip", "application/zip")
+                            else:
+                                for fname, data in generated_files:
+                                    st.download_button(f"📄 {fname}", data, file_name=fname, mime="application/pdf", key=fname)
+                        else:
+                            st.warning("Hiçbir yayın bulunamadı.")
+
+# --- TAB 2: KILAVUZ ---
 with tab_guide:
-    st.header("📖 Dijital Sahaf Nasıl Kullanılır?")
-    
     st.markdown("""
-    ### 1. Adım: Yayın Seçimi
-    * **Katalogdan Seç:** Listeden istediğiniz gazeteyi (Örn: Tanin, Cumhuriyet) seçin.
-    * **Link ile İndir:** GasteArşivi.com'dan kopyaladığınız bir linki yapıştırarak direkt o sayıya gidin.
+    ### 🆚 Kıyaslama Modu
+    Tarihsel olayları analiz etmek için sol menüden **'Manşet Kıyaslama'** modunu seçin. İki farklı gazeteyi yan yana açıp aynı tarihteki manşetlerini karşılaştırabilir ve ayrı ayrı indirebilirsiniz.
     
-    ### 2. Adım: Tarih Belirleme (Sol Menü)
-    * **Tek Gün:** Sadece belirli bir tarihi indirmek için kullanılır.
-    * **Tarih Aralığı (Toplu):** Araştırma yaparken belirli bir dönemi (Örn: 1-30 Ocak 1930) komple indirmek için seçin.
-    * *İpucu:* Toplu indirmede **"Aralığı ZIP Yap"** seçeneği işaretliyse tüm PDF'ler tek bir pakette iner.
-    
-    ### 3. Adım: Görüntü İyileştirme (Image Lab)
-    Eski gazetelerin okunabilirliğini artırmak için sol menüdeki ayarları kullanın:
-    * **Kontrast:** Yazıları koyulaştırır, arka planı siler.
-    * **Parlaklık:** Çok koyu taramaları açar.
-    * **Siyah-Beyaz Modu:** En temiz okuma deneyimi için önerilir (Fotokopi gibi yapar).
-    * **Negatif Mod:** Göz yorgunluğunu azaltmak için (Mikrofilm tarzı).
-    * *Not:* Yaptığınız ayarlar önizlemede anlık görünür ve inen PDF'e de işlenir.
-    
-    ### 4. Adım: İndirme ve Kaynakça
-    * **Önizleme:** Seçtiğiniz tarihte gazete varsa sağda kapağını görürsünüz.
-    * **Kaynakça:** Tez veya makaleniz için otomatik oluşturulan **APA formatındaki** metni kopyalayın.
-    * **İndir:** Butona basın, işlem bitince dosyanızı kaydedin.
+    ### 📡 Yayın Radarı
+    Bir gazetenin önizleme ekranının altında **'Bu Tarihteki Diğer Yayınlar'** panelini açıp tarama yaparsanız, sistem o gün veritabanında mevcut olan diğer tüm gazeteleri listeler.
     """)
 
-# --- TAB 3: GÜNCELLEME NOTLARI ---
+# --- TAB 3: NOTLAR ---
 with tab_notes:
-    st.header("📝 Sürüm Geçmişi")
-    
-    st.info("Şu Anki Sürüm: **v19.0 (Docs Edition)**")
-    
-    st.markdown("""
-    #### v19.0 - Dokümantasyon
-    * ✅ **Kullanma Kılavuzu** sekmesi eklendi.
-    * ✅ **Güncelleme Notları** takip sistemi eklendi.
-    * ✅ Arayüz sekmeli yapıya geçirildi (Daha temiz görünüm).
-    
-    #### v18.0 - Akademik Araştırma
-    * ✅ **Tarih Aralığı Seçimi:** Tek seferde aylık/yıllık tarama imkanı.
-    * ✅ **ZIP Paketleyici:** Çoklu indirmeleri tek dosyada birleştirme.
-    * ✅ **APA Kaynakça:** Otomatik atıf metni oluşturucu.
-    
-    #### v17.0 - Web & Image Lab
-    * ✅ **Web Arayüzü:** Streamlit teknolojisine geçiş (Telefondan erişim).
-    * ✅ **Görüntü Laboratuvarı:** Kontrast, Parlaklık, Siyah-Beyaz filtreleri.
-    * ✅ **Link Ayrıştırıcı:** Direkt link ile indirme desteği.
-    """)
+    st.info("v20.0 - Platinum Edition")
+    st.markdown("* Manşet Kıyaslama Modu eklendi.\n* Günlük Yayın Tarayıcı (Radar) eklendi.\n* APA Citation Engine güncellendi.")
