@@ -1,156 +1,244 @@
 import streamlit as st
+import time
 import requests
-from bs4 import BeautifulSoup
-import pandas as pd
-from urllib.parse import urljoin
+import re
 import os
-import subprocess
-import shutil
+import pandas as pd
+from io import BytesIO
+import zipfile
 
-# --- SAYFA AYARLARI ---
-st.set_page_config(page_title="TUFS Arşiv Tarayıcı", page_icon="🇯🇵", layout="wide")
+# --- SELENIUM AYARLARI ---
+try:
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from webdriver_manager.chrome import ChromeDriverManager
+    from webdriver_manager.core.os_manager import ChromeType
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
 
-# --- GERİ DÖN BUTONU ---
+st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide")
+
+# GERİ DÖN BUTONU
 with st.sidebar:
-    st.title("🏯 TUFS Kontrol")
+    st.title("⚙️ Kontrol Paneli")
     st.page_link("app.py", label="⬅️ Gazete Arşivine Dön", icon="↩️")
     st.markdown("---")
-    st.info("Bu modül, indirilen DjVu dosyalarını sunucuda otomatik olarak PDF'e çevirir.")
 
-st.title("🇯🇵 TUFS: Japonya Tarih Arşivi (Otomatik PDF Çevirici)")
+st.title("🌍 Harici Kaynaklar & Canlı Arama")
 
-# --- HEDEF URL ---
-BASE_URL = "https://www.tufs.ac.jp/common/fs/asw/tur/htu/list1.html"
-
-# --- DJVU -> PDF ÇEVİRME FONKSİYONU ---
-def djvu_to_pdf(input_path, output_path):
-    """
-    DjVu dosyasını ddjvu aracı ile PDF'e çevirir.
-    Gereksinim: packages.txt içinde 'djvulibre-bin' olmalı.
-    """
+# --- TARAYICI BAŞLATMA FONKSİYONU ---
+def baslat_driver():
+    options = Options()
+    options.add_argument("--headless") # Cloud için şart
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    
     try:
-        # Komut: ddjvu -format=pdf input.djvu output.pdf
-        # -skip bozuk sayfaları atlar, -quality ile kaliteyi koruruz
-        command = ["ddjvu", "-format=pdf", "-quality=85", "-skip", input_path, output_path]
-        
-        result = subprocess.run(command, capture_output=True, text=True)
-        
-        if result.returncode == 0 and os.path.exists(output_path):
-            return True, "Başarılı"
-        else:
-            return False, f"Dönüştürme hatası: {result.stderr}"
-    except Exception as e:
-        return False, str(e)
+        service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
+        return webdriver.Chrome(service=service, options=options)
+    except:
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
 
-# --- VERİ ÇEKME FONKSİYONU ---
-def tufs_listesini_getir():
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(BASE_URL, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            response.encoding = response.apparent_encoding
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            veriler = []
-            linkler = soup.find_all('a', href=True)
-            
-            for link in linkler:
-                text = link.get_text().strip()
-                href = link['href']
-                
-                if text and not href.startswith("#") and "javascript" not in href:
-                    full_link = urljoin(BASE_URL, href)
-                    # Sadece indirilebilir dosyalar ve listeleri al
-                    if full_link.endswith(".html") or full_link.endswith(".djvu") or full_link.endswith(".pdf") or "list" in full_link:
-                         veriler.append({"Eser Adı": text, "Link": full_link})
-            return veriler
-        else:
-            st.error(f"Siteye ulaşılamadı. Kod: {response.status_code}")
-            return []
-    except Exception as e:
-        st.error(f"Hata oluştu: {e}")
-        return []
+# --- SEKMELER ---
+tab1, tab2 = st.tabs(["📜 HTU Arşivi (Canlı Tarama)", "🤖 DergiPark Botu"])
 
-# --- ARAYÜZ ---
-col1, col2 = st.columns([1, 4])
-if col1.button("📡 Listeyi Getir", type="primary"):
-    with st.spinner("Liste çekiliyor..."):
-        sonuclar = tufs_listesini_getir()
-        st.session_state.tufs_data = sonuclar # Hafızaya at
+# --------------------------------------------------------
+# SEKME 1: HTU ARŞİVİ (CANLI ARAMA VE İNDİRME)
+# --------------------------------------------------------
+with tab1:
+    st.header("📜 HTU Dijital Süreli Yayınlar")
+    st.info("Bu modül, Tokyo Üniversitesi'nin veritabanını canlı olarak tarar.")
 
-if 'tufs_data' in st.session_state and st.session_state.tufs_data:
-    df = pd.DataFrame(st.session_state.tufs_data)
-    st.success(f"{len(df)} eser listelendi.")
-    st.dataframe(df, use_container_width=True)
-    
-    st.divider()
-    st.subheader("📥 Dosya İndir ve Çevir")
-    
-    # Seçim Kutusu
-    secilen_eser = st.selectbox("İndirmek istediğiniz eseri seçin:", df["Eser Adı"].tolist())
-    
-    if secilen_eser:
-        secilen_veri = df[df["Eser Adı"] == secilen_eser].iloc[0]
-        link = secilen_veri["Link"]
-        
-        st.write(f"**Seçilen Link:** {link}")
-        
-        if st.button("🚀 İndir ve PDF Yap"):
-            with st.status("İşlem yapılıyor...", expanded=True) as status:
+    if not SELENIUM_AVAILABLE:
+        st.error("Selenium eksik! requirements.txt dosyasını kontrol et.")
+    else:
+        # Arama Kutusu
+        with st.form("htu_form"):
+            col1, col2 = st.columns([4,1])
+            htu_kelime = col1.text_input("Yayın Adı veya HTU No Ara:", placeholder="Örn: 11 Temmuz, 0141...")
+            htu_btn = col2.form_submit_button("🔍 Sitede Ara")
+
+        # Session State ile sonuçları sakla (Sayfa yenilenince gitmesin)
+        if 'htu_results' not in st.session_state:
+            st.session_state.htu_results = []
+
+        if htu_btn and htu_kelime:
+            with st.status("📡 Siteye bağlanılıyor ve taranıyor...", expanded=True) as status:
                 try:
-                    # 1. Dosyayı İndir
-                    st.write("Dosya sunucuya indiriliyor...")
-                    headers = {'User-Agent': 'Mozilla/5.0'}
-                    r = requests.get(link, headers=headers, stream=True)
+                    driver = baslat_driver()
+                    # Tokyo Üniversitesi Listesi
+                    TARGET_URL = "http://www.tufs.ac.jp/common/fs/asw/turkey/htu/list_all.html"
+                    st.write("Veritabanına erişiliyor...")
+                    driver.get(TARGET_URL)
                     
-                    dosya_adi = link.split("/")[-1]
-                    if not dosya_adi.endswith(".djvu") and not dosya_adi.endswith(".pdf"):
-                         # Uzantı yoksa ve content-type djvu ise ekle
-                         dosya_adi += ".djvu"
+                    st.write("Veriler analiz ediliyor...")
+                    # Tablodaki satırları bul
+                    rows = driver.find_elements(By.XPATH, "//table[@id='tblist']//tr")
                     
-                    local_djvu_path = f"temp_{dosya_adi}"
-                    local_pdf_path = f"{dosya_adi}.pdf"
-                    
-                    with open(local_djvu_path, "wb") as f:
-                        f.write(r.content)
-                        
-                    # 2. Eğer zaten PDF ise direkt ver
-                    if link.endswith(".pdf"):
-                        st.write("Bu dosya zaten PDF formatında.")
-                        final_path = local_djvu_path
-                        mime_type = "application/pdf"
-                        download_name = dosya_adi
-                        
-                    # 3. DJVU ise Çevir
-                    elif link.endswith(".djvu") or ".djvu" in link:
-                        st.write("⚙️ DjVu formatı tespit edildi. PDF'e dönüştürülüyor (Bu işlem dosya boyutuna göre sürebilir)...")
-                        
-                        basari, mesaj = djvu_to_pdf(local_djvu_path, local_pdf_path)
-                        
-                        if basari:
-                            st.write("✅ Dönüştürme Başarılı!")
-                            final_path = local_pdf_path
-                            mime_type = "application/pdf"
-                            download_name = local_pdf_path
-                        else:
-                            status.update(label="❌ Çevirme Hatası", state="error")
-                            st.error(f"PDF'e çevrilemedi: {mesaj}")
-                            st.info("Orijinal dosya indirilecek.")
-                            final_path = local_djvu_path
-                            mime_type = "image/vnd.djvu"
-                            download_name = dosya_adi
+                    bulunanlar = []
+                    for row in rows:
+                        text_content = row.text
+                        # Arama kelimesi satırda geçiyor mu? (Büyük küçük harf duyarsız)
+                        if htu_kelime.lower() in text_content.lower():
+                            cols = row.find_elements(By.TAG_NAME, "td")
+                            # HTML yapısı: [No] [HTU No] [Title(Link)] [Desc]
+                            if len(cols) >= 4:
+                                htu_no = cols[1].text
+                                title_elem = cols[2]
+                                title_text = title_elem.text
+                                desc_text = cols[3].text
+                                
+                                # Linki al
+                                try:
+                                    link = title_elem.find_element(By.TAG_NAME, "a").get_attribute("href")
+                                except:
+                                    link = ""
 
-                    # 4. İndirme Butonunu Göster
-                    with open(final_path, "rb") as f:
-                        btn = st.download_button(
-                            label=f"💾 {download_name} İndir",
-                            data=f,
-                            file_name=download_name,
-                            mime=mime_type
-                        )
+                                bulunanlar.append({
+                                    "HTU NO.": htu_no,
+                                    "BAŞLIK": title_text,
+                                    "AÇIKLAMA": desc_text,
+                                    "LINK": link
+                                })
                     
-                    status.update(label="✅ Hazır!", state="complete", expanded=False)
+                    st.session_state.htu_results = bulunanlar
+                    driver.quit()
+                    status.update(label="Arama Tamamlandı!", state="complete", expanded=False)
                     
                 except Exception as e:
-                    st.error(f"Hata: {e}")
+                    if 'driver' in locals(): driver.quit()
+                    st.error(f"Hata: {str(e)}")
+
+        # SONUÇLARI GÖSTERME VE SEÇİM TABLOSU
+        if st.session_state.htu_results:
+            st.write(f"Toplam {len(st.session_state.htu_results)} sonuç bulundu.")
+            
+            df = pd.DataFrame(st.session_state.htu_results)
+            
+            # Seçim sütunu ekle (Varsayılan False)
+            df.insert(0, "Seç", False)
+            
+            # Link sütununu gizleyip arka planda tutacağız, tabloda göstermeyeceğiz
+            display_cols = ["Seç", "HTU NO.", "BAŞLIK", "AÇIKLAMA"]
+            
+            edited_df = st.data_editor(
+                df[display_cols],
+                column_config={
+                    "Seç": st.column_config.CheckboxColumn("İndir", default=False),
+                    "HTU NO.": st.column_config.TextColumn("HTU NO.", width="small"),
+                    "BAŞLIK": st.column_config.TextColumn("BAŞLIK", width="medium"),
+                    "AÇIKLAMA": st.column_config.TextColumn("AÇIKLAMA", width="large"),
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+            
+            # İNDİRME İŞLEMİ
+            # Seçilen satırları bul
+            selected_indices = edited_df[edited_df["Seç"] == True].index
+            
+            if len(selected_indices) > 0:
+                st.divider()
+                st.success(f"✅ {len(selected_indices)} yayın seçildi.")
+                
+                if st.button("📦 Seçilenleri İndir (ZIP)", type="primary"):
+                    zip_buffer = BytesIO()
+                    
+                    with st.status("Dosyalar hazırlanıyor...", expanded=True) as dl_status:
+                        with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zf:
+                            for idx in selected_indices:
+                                item = st.session_state.htu_results[idx]
+                                link = item['LINK']
+                                title = item['BAŞLIK']
+                                
+                                # Dosya ismini temizle
+                                safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:30]
+                                
+                                if link.endswith(".djvu"):
+                                    # DjVu indirme ve PDF'e çevirme mantığı
+                                    st.write(f"İndiriliyor: {title}...")
+                                    try:
+                                        # Not: Gerçek sunucuda DjVu to PDF için 'ddjvu' komutu çalışmalı
+                                        # Burada basitçe dosyayı indirip koyuyoruz.
+                                        r = requests.get(link, timeout=30)
+                                        if r.status_code == 200:
+                                            # Orijinal dosyayı ekle
+                                            zf.writestr(f"{safe_title}.djvu", r.content)
+                                        else:
+                                            zf.writestr(f"{safe_title}_HATA.txt", f"Linke erisilemedi: {link}")
+                                    except Exception as e:
+                                        zf.writestr(f"{safe_title}_HATA.txt", str(e))
+                                else:
+                                    zf.writestr(f"{safe_title}_LINK.txt", f"Bu yayin icin direkt link bulunamadi.\nLink: {link}")
+                        
+                        dl_status.update(label="Hazır!", state="complete", expanded=False)
+                    
+                    zip_buffer.seek(0)
+                    st.download_button(
+                        label="💾 ZIP Dosyasını Kaydet",
+                        data=zip_buffer,
+                        file_name="HTU_Secilenler.zip",
+                        mime="application/zip"
+                    )
+        elif htu_btn:
+            st.warning("Eşleşen kayıt bulunamadı.")
+
+# --------------------------------------------------------
+# SEKME 2: DERGİPARK BOTU (Eski Kodun Aynısı)
+# --------------------------------------------------------
+with tab2:
+    st.header("🤖 DergiPark Makale Avcısı")
+    
+    with st.form("dp_form"):
+        col1, col2 = st.columns([4,1])
+        dp_kelime = col1.text_input("Makale Ara:", placeholder="Örn: İttihat ve Terakki")
+        dp_btn = col2.form_submit_button("🚀 Botu Başlat")
+
+    if dp_btn and dp_kelime:
+        with st.status("📡 DergiPark taranıyor...", expanded=True) as status:
+            try:
+                driver = baslat_driver()
+                driver.get(f"https://dergipark.org.tr/tr/search?q={dp_kelime}&section=article")
+                
+                WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.CLASS_NAME, "card-title")))
+                
+                results = []
+                items = driver.find_elements(By.CSS_SELECTOR, "h5.card-title a")
+                for item in items[:15]:
+                    results.append({"title": item.text, "link": item.get_attribute("href")})
+                
+                driver.quit()
+                status.update(label="Bitti!", state="complete", expanded=False)
+                
+                if results:
+                    st.success(f"{len(results)} makale.")
+                    for r in results:
+                        with st.expander(r['title']):
+                            st.write(f"Link: {r['link']}")
+                            # İndirme butonu
+                            if st.button("📥 PDF İndir", key=r['link']):
+                                try:
+                                    headers = {'User-Agent': 'Mozilla/5.0'}
+                                    req = requests.get(r['link'], headers=headers)
+                                    match = re.search(r'/tr/download/article-file/\d+', req.text)
+                                    if match:
+                                        pdf_url = "https://dergipark.org.tr" + match.group(0)
+                                        pdf_data = requests.get(pdf_url, headers=headers).content
+                                        clean_name = re.sub(r'[\\/*?:"<>|]', "", r['title'])[:30] + ".pdf"
+                                        st.download_button("💾 Kaydet", pdf_data, clean_name, "application/pdf")
+                                    else:
+                                        st.error("PDF bulunamadı.")
+                                except:
+                                    st.error("Hata.")
+                else:
+                    st.warning("Sonuç yok.")
+            except Exception as e:
+                st.error(f"Hata: {str(e)}")
