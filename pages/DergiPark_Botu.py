@@ -215,55 +215,113 @@ with tab1:
         st.warning("Veriler çekilemedi. Bağlantınızı kontrol edin veya siteye erişilemiyor.")
 
 # --------------------------------------------------------
-# SEKME 2: DERGİPARK BOTU
+# SEKME 2: DERGİPARK BOTU (BRAVE API VERSİYONU)
 # --------------------------------------------------------
 with tab2:
-    st.header("🤖 DergiPark Makale Avcısı")
-    
-    if not SELENIUM_AVAILABLE:
-        st.error("Selenium eksik! requirements.txt'yi kontrol et.")
-    else:
-        with st.form("dp_form"):
-            col1, col2 = st.columns([4,1])
-            dp_kelime = col1.text_input("Makale Ara:", placeholder="Örn: İttihat ve Terakki")
-            dp_btn = col2.form_submit_button("🚀 Botu Başlat")
+    st.header("🤖 DergiPark Makale Avcısı (Brave Engine)")
+    st.caption("Selenium yok, tarayıcı yok. Brave API ile süper hızlı arama.")
 
-        if dp_btn and dp_kelime:
-            with st.status("📡 DergiPark taranıyor...", expanded=True) as status:
-                try:
-                    driver = baslat_driver()
-                    driver.get(f"https://dergipark.org.tr/tr/search?q={dp_kelime}&section=article")
-                    
-                    time.sleep(5)
-                    
-                    results = []
-                    items = driver.find_elements("css selector", "h5.card-title a")
-                    for item in items[:15]:
-                        results.append({"title": item.text, "link": item.get_attribute("href")})
-                    
-                    driver.quit()
-                    status.update(label="Bitti!", state="complete", expanded=False)
-                    
-                    if results:
-                        st.success(f"{len(results)} makale bulundu.")
-                        for r in results:
-                            with st.expander(r['title']):
-                                st.write(f"Link: {r['link']}")
-                                if st.button("📥 PDF İndir", key=r['link']):
-                                    try:
-                                        headers = {'User-Agent': 'Mozilla/5.0'}
-                                        req = requests.get(r['link'], headers=headers)
-                                        match = re.search(r'/tr/download/article-file/\d+', req.text)
-                                        if match:
-                                            pdf_url = "https://dergipark.org.tr" + match.group(0)
-                                            pdf_data = requests.get(pdf_url, headers=headers).content
-                                            clean_name = re.sub(r'[\\/*?:"<>|]', "", r['title'])[:30] + ".pdf"
-                                            st.download_button("💾 Kaydet", pdf_data, clean_name, "application/pdf")
-                                        else:
-                                            st.error("PDF bulunamadı.")
-                                    except:
-                                        st.error("Hata.")
-                    else:
-                        st.warning("Sonuç yok.")
-                except Exception as e:
-                    st.error(f"Hata: {str(e)}")
+    # Brave API Fonksiyonu (DergiPark'a Özel)
+    def search_dergipark_brave(keyword, count=15):
+        try:
+            # secrets.toml'dan şifreyi al
+            api_key = st.secrets["BRAVE_API_KEY"]
+        except:
+            st.error("⚠️ API Anahtarı bulunamadı! secrets.toml dosyasını kontrol et.")
+            return []
+
+        url = "https://api.search.brave.com/res/v1/web/search"
+        # Sadece DergiPark içinde, makale bölümünde ara
+        query = f'site:dergipark.org.tr/tr/pub "{keyword}"'
+        
+        headers = {
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip",
+            "X-Subscription-Token": api_key
+        }
+        
+        params = {"q": query, "count": count, "country": "tr"}
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                results = []
+                if "web" in data and "results" in data["web"]:
+                    for item in data["web"]["results"]:
+                        # DergiPark makale linkleri genellikle /pub/ ile başlar
+                        results.append({
+                            "title": item["title"],
+                            "link": item["url"],
+                            "desc": item.get("description", "")
+                        })
+                return results
+            else:
+                st.error(f"Brave Hatası: {response.status_code}")
+                return []
+        except Exception as e:
+            st.error(f"Bağlantı Hatası: {e}")
+            return []
+
+    # PDF Bulucu Fonksiyon
+    def fetch_pdf_content(article_url):
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        try:
+            # 1. Makale sayfasına gir
+            r = requests.get(article_url, headers=headers, timeout=10)
+            
+            # 2. PDF linkini regex ile avla
+            # Kalıp: /tr/download/article-file/123456
+            match = re.search(r'/tr/download/article-file/\d+', r.text)
+            
+            if match:
+                pdf_link = "https://dergipark.org.tr" + match.group(0)
+                
+                # 3. PDF'i indir
+                pdf_response = requests.get(pdf_link, headers=headers, timeout=15)
+                return pdf_response.content
+        except:
+            return None
+        return None
+
+    # --- ARAYÜZ ---
+    with st.form("dp_form"):
+        col1, col2 = st.columns([4,1])
+        dp_kelime = col1.text_input("Makale Ara:", placeholder="Örn: İttihat ve Terakki")
+        dp_btn = col2.form_submit_button("🚀 Hızlı Ara")
+
+    if dp_btn and dp_kelime:
+        with st.spinner("🦁 Brave motoru DergiPark arşivini tarıyor..."):
+            sonuclar = search_dergipark_brave(dp_kelime)
+            
+            if sonuclar:
+                st.success(f"✅ {len(sonuclar)} makale bulundu.")
+                
+                for i, makale in enumerate(sonuclar):
+                    with st.expander(f"📄 {makale['title']}"):
+                        st.write(f"_{makale['desc']}_")
+                        st.markdown(f"[Orjinal Sayfaya Git]({makale['link']})")
+                        
+                        # Benzersiz anahtar (Key) oluşturma
+                        btn_key = f"dp_dl_{i}"
+                        
+                        # İndirme İşlemi
+                        if st.button("📥 PDF'i Bul ve Getir", key=btn_key):
+                            with st.spinner("PDF sunucudan çekiliyor..."):
+                                pdf_data = fetch_pdf_content(makale['link'])
+                                
+                                if pdf_data:
+                                    safe_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:40] + ".pdf"
+                                    st.download_button(
+                                        label="💾 Bilgisayara Kaydet",
+                                        data=pdf_data,
+                                        file_name=safe_name,
+                                        mime="application/pdf",
+                                        key=f"save_{btn_key}"
+                                    )
+                                else:
+                                    st.error("❌ Bu makalenin PDF'i erişime kapalı veya bulunamadı.")
+            else:
+                st.warning("Sonuç bulunamadı.")
