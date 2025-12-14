@@ -3,3 +3,5 @@ requests
 Pillow
 pytesseract
 pandas
+webdriver-manager
+selenium
