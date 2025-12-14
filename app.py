@@ -220,6 +220,15 @@ def process_archive_single(gid, name, date_obj, img_settings, pdf_settings, prog
 # --- 6. ARAYÜZ (SIDEBAR) ---
 
 st.sidebar.title("🛠️ Kontrol Paneli")
+
+# --- YENİ EKLENEN KISIM: BOT BUTONU ---
+st.sidebar.subheader("🌍 Harici Arşivler")
+st.sidebar.info("Akademik makale taraması için botu başlatın.")
+# Bu buton 'pages/DergiPark_Botu.py' dosyasını açar
+st.page_link("pages/DergiPark_Botu.py", label="DergiPark Makale Botu", icon="🤖")
+st.sidebar.markdown("---")
+# --------------------------------------
+
 nav_mode = st.sidebar.radio("Çalışma Modu", ["📖 Katalogdan Seç", "🔗 Link ile İndir", "🆚 Manşet Kıyaslama"])
 st.sidebar.markdown("---")
 
