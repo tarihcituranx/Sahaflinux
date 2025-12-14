@@ -1,104 +1,95 @@
 import streamlit as st
-import cloudscraper # <-- YENİ SİLAHIMIZ
-from PIL import Image, ImageEnhance, ImageOps
+from googlesearch import search
+import requests
+from PIL import Image, ImageOps
 from io import BytesIO
-from datetime import date, datetime
-import json
 import re
+import time
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(
-    page_title="Gaste Arama Motoru",
-    page_icon="🔍",
+    page_title="Google Destekli Sahaf",
+    page_icon="🌍",
     layout="wide"
-)
-
-# --- SCRAPER AYARLARI ---
-# Cloudflare korumasını aşan özel tarayıcı nesnesi
-scraper = cloudscraper.create_scraper(
-    browser={
-        'browser': 'chrome',
-        'platform': 'windows',
-        'desktop': True
-    }
 )
 
 # --- FONKSİYONLAR ---
 
-def search_via_html(keyword, start_date, end_date):
+def google_ile_ara(keyword, num_results=20):
     """
-    Cloudscraper kullanarak siteye 'insan gibi' girer ve
-    gizli JSON verisini çeker. 403 hatasını bypass eder.
+    Google'da 'site:gastearsivi.com keyword' araması yapar
+    ve sonuçları bizim formatımıza çevirir.
     """
+    # Google'a özel sorgu formatı
+    query = f'site:gastearsivi.com "{keyword}"'
     
-    s_date_str = start_date.strftime("%Y-%m-%d")
-    e_date_str = end_date.strftime("%Y-%m-%d")
-    
-    # Arama URL'si
-    target_url = f"https://www.gastearsivi.com/ara?q={keyword}&startDate={s_date_str}&endDate={e_date_str}&sort=best"
+    found_items = []
     
     try:
-        # requests.get YERİNE scraper.get KULLANIYORUZ
-        response = scraper.get(target_url, timeout=15)
+        # Google'dan sonuçları çek (advanced=True başlık ve açıklama da getirir)
+        search_results = search(query, num_results=num_results, advanced=True, lang="tr")
         
-        if response.status_code == 200:
-            html_content = response.text
+        for result in search_results:
+            url = result.url
+            title = result.title
+            desc = result.description
             
-            # Gizli JSON verisini bul (Regex)
-            pattern = r'window\.__APOLLO_STATE__\s*=\s*({.*?});'
-            match = re.search(pattern, html_content, re.DOTALL)
+            # URL Analizi (Regex ile ID, Tarih ve Sayfa No'yu söküyoruz)
+            # Link Tipi: https://www.gastearsivi.com/gazete/aksam/1938-11-10/1
+            match = re.search(r"gazete\/([^\/]+)\/(\d{4}-\d{2}-\d{2})\/(\d+)", url)
             
             if match:
-                json_str = match.group(1)
-                data = json.loads(json_str)
+                gid = match.group(1)
+                date_str = match.group(2)
+                page_num = match.group(3)
                 
-                found_pages = []
+                # Gazete adını güzelleştir
+                g_name = gid.replace("_", " ").replace("-", " ").title()
                 
-                # Karmaşık JSON ağacını tarayalım
-                for key, value in data.items():
-                    if key == "ROOT_QUERY":
-                        for sub_key, sub_val in value.items():
-                            if sub_key.startswith("arama") and "sayfalar" in sub_val:
-                                page_refs = sub_val["sayfalar"]
-                                for ref in page_refs:
-                                    ref_id = ref.get("__ref")
-                                    if ref_id and ref_id in data:
-                                        page_data = data[ref_id]
-                                        found_pages.append({
-                                            "id": page_data.get("id"),
-                                            "gazete": page_data.get("gazete"),
-                                            "tarih": page_data.get("tarih"),
-                                            "sayfa": page_data.get("sayfa"),
-                                            "thumbnail": page_data.get("thumbnail")
-                                        })
-                return found_pages
-            else:
-                # Eğer regex bulamazsa, belki sonuç yoktur.
-                pass
-        elif response.status_code == 403:
-            st.error("⚠️ Site hala bot olduğumuzu düşünüyor. Biraz bekleyip tekrar deneyin.")
-        else:
-            st.error(f"Hata Kodu: {response.status_code}")
-            
+                found_items.append({
+                    "id": gid,
+                    "name": g_name,
+                    "date": date_str,
+                    "page": page_num,
+                    "title": title,
+                    "desc": desc,
+                    "url": url
+                })
+                
     except Exception as e:
-        st.error(f"Bağlantı Hatası: {e}")
+        st.error(f"Google Arama Hatası: {e}")
+        st.warning("Çok sık arama yaptıysanız Google geçici olarak engellemiş olabilir.")
         
-    return []
+    return found_items
 
-def download_page_as_pdf(gid, date_str, page_num):
-    """Resmi indirir (Burada da Scraper kullanıyoruz)"""
+def get_cdn_image(gid, date_str, page_num):
+    """Resmi CDN'den çeker (Engel yok)"""
     base_url = "https://dzp35pmd4yqn4.cloudfront.net"
-    img_url = f"{base_url}/sayfalar/{gid}/{date_str}-{page_num}.jpg"
     
+    # İki tip thumbnail adresi deniyoruz (Büyük ve Küçük)
+    urls = [
+        f"{base_url}/thumbnails/{gid}/{date_str}-{page_num}-thumbnail250.jpg", # Küçük (Hızlı)
+        f"{base_url}/sayfalar/{gid}/{date_str}-{page_num}.jpg" # Büyük
+    ]
+    
+    for url in urls:
+        try:
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=3)
+            if r.status_code == 200:
+                return Image.open(BytesIO(r.content))
+        except:
+            pass
+    return None
+
+def download_pdf(gid, date_str, page_num):
+    """Yüksek kaliteli PDF indirir"""
+    url = f"https://dzp35pmd4yqn4.cloudfront.net/sayfalar/{gid}/{date_str}-{page_num}.jpg"
     try:
-        # Resim sunucusu genelde 403 vermez ama garanti olsun diye scraper ile çekelim
-        r = scraper.get(img_url, timeout=10)
+        r = requests.get(url, timeout=10)
         if r.status_code == 200:
-            image = Image.open(BytesIO(r.content))
-            image = image.convert("L") # Siyah Beyaz (Daha net)
-            
+            img = Image.open(BytesIO(r.content)).convert("L")
             pdf_buffer = BytesIO()
-            image.save(pdf_buffer, format="PDF", resolution=100.0, quality=85)
+            img.save(pdf_buffer, format="PDF", resolution=100.0, quality=85)
             pdf_buffer.seek(0)
             return pdf_buffer
     except:
@@ -107,50 +98,65 @@ def download_page_as_pdf(gid, date_str, page_num):
 
 # --- ARAYÜZ ---
 
-st.title("🔍 Tarihi Gazete Arama Motoru")
-st.caption("GasteArşivi Bot Korumasını Aşan Sürüm (v3.0)")
+st.title("🌍 Google Destekli Dijital Sahaf")
+st.markdown("""
+Bu modül, sitenin kendi arama motorunu değil, **Google altyapısını** kullanır. 
+Böylece 'Sonuç Bulunamadı' veya '403 Yasak' hatalarını aşarsınız.
+""")
 
-with st.form("search_form"):
-    c1, c2, c3, c4 = st.columns([3, 1, 1, 1])
+with st.sidebar:
+    st.header("Arama Ayarları")
+    keyword = st.text_input("Anahtar Kelime", placeholder="Örn: Hatay Meselesi")
+    limit = st.slider("Sonuç Sayısı", 10, 100, 20)
+    search_btn = st.button("Google'da Ara 🚀", type="primary")
     
-    keyword = c1.text_input("Aranacak Kelime", placeholder="Örn: Atatürk, Seçim, Kıbrıs...")
-    s_date = c2.date_input("Başlangıç", date(1923, 10, 29))
-    e_date = c3.date_input("Bitiş", date(1938, 11, 10))
-    submit_btn = c4.form_submit_button("ARA 🚀", use_container_width=True)
+    st.info("İpucu: Tarih aralığı için kelimenin yanına yıl yazabilirsiniz. Örn: 'Atatürk 1938'")
 
-if submit_btn and keyword:
-    with st.spinner(f"🛡️ Güvenlik duvarı aşılıyor ve '{keyword}' aranıyor..."):
-        results = search_via_html(keyword, s_date, e_date)
+# --- İŞLEM ---
+if search_btn and keyword:
+    with st.spinner("Google taranıyor, linkler ayıklanıyor..."):
+        results = google_ile_ara(keyword, limit)
         
         if results:
-            st.success(f"✅ {len(results)} sayfa bulundu.")
+            st.success(f"✅ {len(results)} adet sonuç bulundu ve listelendi.")
             st.markdown("---")
             
             # Sonuçları Göster
-            cols = st.columns(4)
-            for idx, item in enumerate(results):
-                with cols[idx % 4]:
-                    thumb_url = f"https://dzp35pmd4yqn4.cloudfront.net/{item['thumbnail']}"
+            for item in results:
+                with st.container():
+                    c1, c2 = st.columns([1, 4])
                     
-                    st.image(thumb_url, use_container_width=True)
-                    st.markdown(f"**{item['gazete'].upper()}**")
-                    st.caption(f"📅 {item['tarih']} | Sayfa: {item['sayfa']}")
-                    
-                    unique_key = f"{item['id']}_{idx}"
-                    
-                    if st.button("📥 İndir", key=unique_key):
-                        pdf_data = download_page_as_pdf(item['gazete'], item['tarih'], item['sayfa'])
-                        if pdf_data:
-                            file_name = f"{item['gazete']}_{item['tarih']}_S{item['sayfa']}.pdf"
-                            st.download_button(
-                                label="💾 Kaydet",
-                                data=pdf_data,
-                                file_name=file_name,
-                                mime="application/pdf",
-                                key=f"dl_{unique_key}"
-                            )
+                    # Sol: Resim
+                    with c1:
+                        img = get_cdn_image(item['id'], item['date'], item['page'])
+                        if img:
+                            st.image(img, use_container_width=True)
                         else:
-                            st.error("Dosya alınamadı.")
+                            st.image("https://placehold.co/200x300?text=Resim+Yok", use_container_width=True)
+                    
+                    # Sağ: Bilgi ve İndirme
+                    with c2:
+                        st.subheader(f"{item['name']} - {item['date']}")
+                        st.caption(f"Sayfa: {item['page']} | Kaynak: Google")
+                        st.write(f"**Özet:** {item['desc']}")
+                        st.markdown(f"[Orjinal Linke Git]({item['url']})")
+                        
+                        # İndirme Butonu
+                        unique_key = f"{item['id']}_{item['date']}_{item['page']}"
+                        if st.button(f"📥 PDF Olarak İndir ({item['name']})", key=unique_key):
+                            with st.spinner("İndiriliyor..."):
+                                pdf_data = download_pdf(item['id'], item['date'], item['page'])
+                                if pdf_data:
+                                    fname = f"{item['name']}_{item['date']}_S{item['page']}.pdf"
+                                    st.download_button(
+                                        label="💾 Dosyayı Kaydet",
+                                        data=pdf_data,
+                                        file_name=fname,
+                                        mime="application/pdf",
+                                        key=f"dl_{unique_key}"
+                                    )
+                                else:
+                                    st.error("Dosya sunucudan çekilemedi.")
+                    st.divider()
         else:
-            st.warning("Sonuç bulunamadı.")
-            st.info("Eğer sürekli hata alıyorsanız, çok sık istek gönderdiğiniz için kısa süreli banlanmış olabilirsiniz.")
+            st.warning("Google'da bu kelimeyle ilgili, bu siteye ait sonuç bulunamadı.")
