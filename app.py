@@ -225,7 +225,7 @@ st.sidebar.title("🛠️ Kontrol Paneli")
 st.sidebar.subheader("🌍 Harici Arşivler")
 st.sidebar.info("Akademik makale taraması için botu başlatın.")
 # Bu buton 'pages/DergiPark_Botu.py' dosyasını açar
-st.page_link("pages/DergiPark_Botu.py", label="DergiPark Makale Botu", icon="🤖")
+st.page_link("pages/DergiPark_Botu.py", label="HTU Arşivi", icon="🤖")
 st.sidebar.markdown("---")
 # --------------------------------------
 
