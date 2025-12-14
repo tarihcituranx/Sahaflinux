@@ -16,3 +16,4 @@ pytesseract
 pdf2image
 cloudscraper
 googlesearch-python
+duckduckgo-search
