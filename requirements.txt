@@ -14,3 +14,4 @@ selenium
 webdriver-manager
 pytesseract
 pdf2image
+cloudscraper
