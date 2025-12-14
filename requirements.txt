@@ -15,3 +15,4 @@ webdriver-manager
 pytesseract
 pdf2image
 cloudscraper
+googlesearch-python
