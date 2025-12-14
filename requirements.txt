@@ -14,4 +14,3 @@ selenium
 webdriver-manager
 pytesseract
 pdf2image
-python-djvulibre
