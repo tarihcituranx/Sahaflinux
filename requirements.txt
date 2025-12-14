@@ -6,3 +6,12 @@ pandas
 webdriver-manager
 selenium
 bs4
+streamlit
+requests
+Pillow
+pandas
+selenium
+webdriver-manager
+pytesseract
+pdf2image
+python-djvulibre
