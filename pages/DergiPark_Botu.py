@@ -35,7 +35,7 @@ with st.sidebar:
     st.info("İşiniz bitince ana sayfaya dönmek için aşağıdaki butona basın.")
     # BURAYA DİKKAT: Ana dosyanızın adı 'Ana_Sayfa.py' ise burası doğru.
     # Eğer dosya adınız farklıysa burayı değiştirin.
-    st.page_link("Ana_Sayfa.py", label="⬅️ Gazete Arşivine Dön", icon="↩️")
+    st.page_link("app.py", label="⬅️ Gazete Arşivine Dön", icon="↩️")
     st.markdown("---")
 
 # --- ANA EKRAN ---
