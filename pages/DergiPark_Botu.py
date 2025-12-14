@@ -215,23 +215,23 @@ with tab1:
         st.warning("Veriler çekilemedi. Bağlantınızı kontrol edin veya siteye erişilemiyor.")
 
 # --------------------------------------------------------
-# SEKME 2: DERGİPARK BOTU (BRAVE API VERSİYONU)
+# SEKME 2: DERGİPARK BOTU (BRAVE + CLOUDSCRAPER)
 # --------------------------------------------------------
-with tab2:
-    st.header("🤖 DergiPark Makale Avcısı (Brave Engine)")
-    st.caption("Selenium yok, tarayıcı yok. Brave API ile süper hızlı arama.")
+import cloudscraper # Bunu en tepeye eklemeyi unutma, yoksa hata verir!
 
-    # Brave API Fonksiyonu (DergiPark'a Özel)
+with tab2:
+    st.header("🤖 DergiPark Makale Avcısı")
+    st.caption("Brave ile bulur, Cloudscraper ile indirir.")
+
+    # 1. BRAVE İLE ARAMA FONKSİYONU
     def search_dergipark_brave(keyword, count=15):
         try:
-            # secrets.toml'dan şifreyi al
             api_key = st.secrets["BRAVE_API_KEY"]
         except:
-            st.error("⚠️ API Anahtarı bulunamadı! secrets.toml dosyasını kontrol et.")
+            st.error("⚠️ API Anahtarı eksik! secrets.toml dosyasını kontrol et.")
             return []
 
         url = "https://api.search.brave.com/res/v1/web/search"
-        # Sadece DergiPark içinde, makale bölümünde ara
         query = f'site:dergipark.org.tr/tr/pub "{keyword}"'
         
         headers = {
@@ -249,7 +249,6 @@ with tab2:
                 results = []
                 if "web" in data and "results" in data["web"]:
                     for item in data["web"]["results"]:
-                        # DergiPark makale linkleri genellikle /pub/ ile başlar
                         results.append({
                             "title": item["title"],
                             "link": item["url"],
@@ -263,37 +262,46 @@ with tab2:
             st.error(f"Bağlantı Hatası: {e}")
             return []
 
-    # PDF Bulucu Fonksiyon
+    # 2. PDF BULUCU (GÜÇLENDİRİLMİŞ VERSİYON)
     def fetch_pdf_content(article_url):
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+        # Cloudscraper ile gerçek tarayıcı taklidi yapıyoruz
+        scraper = cloudscraper.create_scraper(
+            browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+        )
+        
         try:
-            # 1. Makale sayfasına gir
-            r = requests.get(article_url, headers=headers, timeout=10)
+            # 1. Sayfanın içine gir
+            response = scraper.get(article_url, timeout=15)
             
-            # 2. PDF linkini regex ile avla
-            # Kalıp: /tr/download/article-file/123456
-            match = re.search(r'/tr/download/article-file/\d+', r.text)
+            # 2. PDF linkini Regex ile ara (Daha esnek bir regex)
+            # Hem /tr/ hem /en/ hem de direkt download linklerini yakalar
+            match = re.search(r'href="([^"]*\/download\/article-file\/\d+)"', response.text)
             
             if match:
-                pdf_link = "https://dergipark.org.tr" + match.group(0)
+                # Link bazen tam (https://...) bazen yarım (/tr/...) gelir
+                pdf_link = match.group(1)
+                if not pdf_link.startswith("http"):
+                    pdf_link = "https://dergipark.org.tr" + pdf_link
                 
-                # 3. PDF'i indir
-                pdf_response = requests.get(pdf_link, headers=headers, timeout=15)
+                # 3. PDF'i indir (Yine scraper ile)
+                pdf_response = scraper.get(pdf_link, timeout=15)
                 return pdf_response.content
-        except:
+            else:
+                # Bazen link gizli olabilir veya yapı farklıdır
+                return None
+        except Exception as e:
+            st.error(f"İndirme hatası: {e}")
             return None
         return None
 
     # --- ARAYÜZ ---
     with st.form("dp_form"):
         col1, col2 = st.columns([4,1])
-        dp_kelime = col1.text_input("Makale Ara:", placeholder="Örn: İttihat ve Terakki")
-        dp_btn = col2.form_submit_button("🚀 Hızlı Ara")
+        dp_kelime = col1.text_input("Makale Ara:", placeholder="Örn: Milli Mücadele, Norşin Medresesi")
+        dp_btn = col2.form_submit_button("🚀 Ara")
 
     if dp_btn and dp_kelime:
-        with st.spinner("🦁 Brave motoru DergiPark arşivini tarıyor..."):
+        with st.spinner("🦁 Brave arşivleri tarıyor..."):
             sonuclar = search_dergipark_brave(dp_kelime)
             
             if sonuclar:
@@ -302,26 +310,32 @@ with tab2:
                 for i, makale in enumerate(sonuclar):
                     with st.expander(f"📄 {makale['title']}"):
                         st.write(f"_{makale['desc']}_")
-                        st.markdown(f"[Orjinal Sayfaya Git]({makale['link']})")
                         
-                        # Benzersiz anahtar (Key) oluşturma
-                        btn_key = f"dp_dl_{i}"
+                        col_a, col_b = st.columns([1, 3])
                         
-                        # İndirme İşlemi
-                        if st.button("📥 PDF'i Bul ve Getir", key=btn_key):
-                            with st.spinner("PDF sunucudan çekiliyor..."):
-                                pdf_data = fetch_pdf_content(makale['link'])
-                                
-                                if pdf_data:
-                                    safe_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:40] + ".pdf"
-                                    st.download_button(
-                                        label="💾 Bilgisayara Kaydet",
-                                        data=pdf_data,
-                                        file_name=safe_name,
-                                        mime="application/pdf",
-                                        key=f"save_{btn_key}"
-                                    )
-                                else:
-                                    st.error("❌ Bu makalenin PDF'i erişime kapalı veya bulunamadı.")
+                        # Benzersiz Anahtar
+                        unique_key = f"dp_{i}"
+                        
+                        with col_a:
+                            if st.button("📥 PDF İndir", key=unique_key):
+                                with st.spinner("Bulutlardan indiriliyor..."):
+                                    pdf_data = fetch_pdf_content(makale['link'])
+                                    
+                                    if pdf_data:
+                                        # Dosya adını temizle
+                                        clean_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:30] + ".pdf"
+                                        st.download_button(
+                                            label="💾 Kaydet",
+                                            data=pdf_data,
+                                            file_name=clean_name,
+                                            mime="application/pdf",
+                                            key=f"save_{unique_key}"
+                                        )
+                                    else:
+                                        st.error("⚠️ PDF dosyası sayfada bulunamadı (Erişim kısıtlı olabilir).")
+                                        st.info("Lütfen yandaki 'Siteye Git' linkini kullanın.")
+                        
+                        with col_b:
+                            st.markdown(f"👉 **[Siteye Git ve Oku]({makale['link']})**")
             else:
                 st.warning("Sonuç bulunamadı.")
