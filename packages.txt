@@ -1,2 +1,6 @@
 tesseract-ocr
 libtesseract-dev
+chromium
+chromium-driver
+djvulibre-bin
+ghostscript
