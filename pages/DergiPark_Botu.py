@@ -7,6 +7,10 @@ import pandas as pd
 from io import BytesIO
 import zipfile
 from bs4 import BeautifulSoup
+import urllib3
+
+# SSL Uyarılarını Sustur (Log kirliliğini önler)
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- SELENIUM AYARLARI ---
 try:
@@ -24,7 +28,6 @@ st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide
 # GERİ DÖN BUTONU
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
-    # Dosya adın 'Ana_Sayfa.py' ise burası doğru
     st.page_link("app.py", label="⬅️ Gazete Arşivine Dön", icon="↩️")
     st.markdown("---")
 
@@ -33,7 +36,7 @@ st.title("🌍 Harici Kaynaklar & Canlı Arama")
 # --- TARAYICI BAŞLATMA FONKSİYONU ---
 def baslat_driver():
     options = Options()
-    options.add_argument("--headless") # Cloud için şart
+    options.add_argument("--headless")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
@@ -46,45 +49,61 @@ def baslat_driver():
         service = Service(ChromeDriverManager().install())
         return webdriver.Chrome(service=service, options=options)
 
-# --- HTU VERİ ÇEKME FONKSİYONU (REQUESTS İLE - DAHA HIZLI) ---
-@st.cache_data(ttl=3600) # 1 saat önbellekte tutar, sürekli siteye gitmez
+# --- GÜÇLENDİRİLMİŞ HTU VERİ ÇEKME FONKSİYONU ---
+@st.cache_data(ttl=3600)
 def htu_verilerini_getir():
     base_url = "https://www.tufs.ac.jp/common/fs/asw/tur/htu/"
-    pages = ["list1.html", "list2.html"] # A-L ve M-Z listeleri
+    pages = ["list1.html", "list2.html"]
+    
+    # Tarayıcı Taklidi Yapan Başlıklar
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+    }
     
     all_data = []
     
     for page in pages:
+        full_url = base_url + page
         try:
-            r = requests.get(base_url + page)
-            r.encoding = 'utf-8'
+            # verify=False ekledik (SSL hatasını aşmak için)
+            r = requests.get(full_url, headers=headers, timeout=30, verify=False)
+            r.encoding = 'utf-8' # Türkçe karakter sorunu için
+            
             if r.status_code == 200:
                 soup = BeautifulSoup(r.text, 'html.parser')
-                # Tabloyu bul (id='tblist')
                 table = soup.find('table', id='tblist')
+                
                 if table:
                     rows = table.find_all('tr')
                     for row in rows:
                         cols = row.find_all('td')
-                        # Yapı: [No] [HTU No] [Title (Link)] [Desc]
                         if len(cols) >= 4:
                             htu_no = cols[1].get_text(strip=True)
+                            
+                            # Başlık satırlarını atla
+                            if "HTU NO." in htu_no or not htu_no:
+                                continue
+
                             title_col = cols[2]
                             desc_col = cols[3]
                             
                             title_text = title_col.get_text(strip=True)
                             desc_text = desc_col.get_text(strip=True)
                             
-                            # Linki al ve tam adrese çevir
+                            # Linki al
                             link_tag = title_col.find('a')
                             if link_tag and link_tag.has_attr('href'):
-                                full_link = base_url + link_tag['href']
+                                raw_link = link_tag['href']
+                                # Eğer link "data/..." diye başlıyorsa başına base_url ekle
+                                if not raw_link.startswith("http"):
+                                    full_link = base_url + raw_link
+                                else:
+                                    full_link = raw_link
                             else:
                                 full_link = ""
-                                
-                            # Başlık satırlarını (A, B, C...) atla
-                            if "HTU no." in htu_no or not htu_no:
-                                continue
                                 
                             all_data.append({
                                 "HTU NO.": htu_no,
@@ -92,28 +111,22 @@ def htu_verilerini_getir():
                                 "AÇIKLAMA": desc_text,
                                 "LINK": full_link
                             })
+            else:
+                st.error(f"Hata: {page} sayfası {r.status_code} kodu döndürdü.")
+                
         except Exception as e:
-            st.error(f"Veri çekme hatası ({page}): {e}")
+            st.error(f"Bağlantı hatası ({page}): {e}")
             
     return pd.DataFrame(all_data)
 
-# --- DJVU İNDİRME VE DÖNÜŞTÜRME ---
+# --- DJVU İNDİRME ---
 def download_and_process_djvu(url, filename):
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
-        # 1. Dosyayı İndir
-        r = requests.get(url, stream=True)
+        r = requests.get(url, headers=headers, stream=True, verify=False)
         if r.status_code != 200:
-            return None, "Dosya indirilemedi."
-        
-        djvu_content = r.content
-        
-        # 2. PDF'e çevirmeyi dene (Sunucuda araç varsa)
-        # Not: Streamlit Cloud'da 'ddjvu' komutu packages.txt ile yüklenir.
-        # Ancak işlemci gücü yetmeyebilir veya dosya çok büyük olabilir.
-        # Bu yüzden önce basitçe orijinali verelim, opsiyonel çeviri yapalım.
-        
-        return djvu_content, "OK"
-        
+            return None, "Dosya sunucuda bulunamadı."
+        return r.content, "OK"
     except Exception as e:
         return None, str(e)
 
@@ -121,18 +134,18 @@ def download_and_process_djvu(url, filename):
 tab1, tab2 = st.tabs(["📜 HTU Arşivi (Canlı Tarama)", "🤖 DergiPark Botu"])
 
 # --------------------------------------------------------
-# SEKME 1: HTU ARŞİVİ (CANLI ARAMA VE İNDİRME)
+# SEKME 1: HTU ARŞİVİ
 # --------------------------------------------------------
 with tab1:
     st.header("📜 HTU Dijital Süreli Yayınlar")
-    st.info("Bu modül, Tokyo Üniversitesi'nin (HTU) A-Z listelerini canlı tarar.")
+    st.info("Tokyo Üniversitesi Arşivi (Canlı Veri)")
 
     # Arama Kutusu
     col1, col2 = st.columns([4,1])
     search_term = col1.text_input("Yayın Adı veya HTU No Ara:", placeholder="Örn: 11 Temmuz...")
     
     # Verileri Çek
-    with st.spinner("Veritabanı güncelleniyor..."):
+    with st.spinner("Veritabanına bağlanılıyor..."):
         df = htu_verilerini_getir()
     
     if not df.empty:
@@ -148,15 +161,14 @@ with tab1:
 
         st.write(f"Toplam {len(filtered_df)} sonuç bulundu.")
         
-        # Tabloyu Göster (Seçim Kutulu)
-        # Önce 'Seç' sütunu ekle
+        # Tablo
         filtered_df.insert(0, "Seç", False)
         
         edited_df = st.data_editor(
             filtered_df,
             column_config={
                 "Seç": st.column_config.CheckboxColumn("İndir", default=False),
-                "LINK": st.column_config.LinkColumn("Doğrudan Link"),
+                "LINK": st.column_config.LinkColumn("Görüntüle"),
             },
             hide_index=True,
             use_container_width=True,
@@ -168,8 +180,6 @@ with tab1:
         
         if not selected_rows.empty:
             st.divider()
-            st.success(f"✅ {len(selected_rows)} yayın seçildi.")
-            
             if st.button("📦 Seçilenleri İndir (ZIP)", type="primary"):
                 progress_bar = st.progress(0)
                 zip_buffer = BytesIO()
@@ -178,19 +188,19 @@ with tab1:
                     for idx, row in enumerate(selected_rows.itertuples()):
                         link = row.LINK
                         title = row.BAŞLIK
-                        safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:40] # Dosya adı temizliği
+                        safe_title = re.sub(r'[\\/*?:"<>|]', "", title)[:40]
                         
                         if link.endswith(".djvu"):
-                            st.toast(f"İndiriliyor: {safe_title}...")
+                            # DjVu dosyasını indir
                             content, msg = download_and_process_djvu(link, safe_title)
-                            
                             if content:
-                                # Orijinal DjVu dosyasını ekle
                                 zf.writestr(f"{safe_title}.djvu", content)
                             else:
-                                zf.writestr(f"{safe_title}_HATA.txt", f"İndirme hatası: {msg}")
+                                zf.writestr(f"{safe_title}_HATA.txt", f"Hata: {msg}")
                         else:
-                            zf.writestr(f"{safe_title}_LINK.txt", f"Bu yayın bir klasör veya sayfadır. Link: {link}")
+                            # Link DjVu değilse (HTML sayfası veya klasör ise)
+                            txt_info = f"Bu yayin direkt dosya degil, bir sayfa veya klasordur.\nLutfen tarayicida aciniz: {link}"
+                            zf.writestr(f"{safe_title}_LINK.txt", txt_info)
                         
                         progress_bar.progress((idx + 1) / len(selected_rows))
                 
@@ -198,20 +208,20 @@ with tab1:
                 st.download_button(
                     label="💾 ZIP Dosyasını Kaydet",
                     data=zip_buffer,
-                    file_name="HTU_Secilenler.zip",
+                    file_name="HTU_Arsiv.zip",
                     mime="application/zip"
                 )
     else:
-        st.warning("Veri çekilemedi. Lütfen bağlantınızı kontrol edin.")
+        st.warning("Veriler çekilemedi. Bağlantınızı kontrol edin veya siteye erişilemiyor.")
 
 # --------------------------------------------------------
-# SEKME 2: DERGİPARK BOTU (Mevcut Bot Kodu)
+# SEKME 2: DERGİPARK BOTU
 # --------------------------------------------------------
 with tab2:
     st.header("🤖 DergiPark Makale Avcısı")
     
     if not SELENIUM_AVAILABLE:
-        st.error("Selenium kütüphanesi eksik!")
+        st.error("Selenium eksik! requirements.txt'yi kontrol et.")
     else:
         with st.form("dp_form"):
             col1, col2 = st.columns([4,1])
@@ -224,11 +234,9 @@ with tab2:
                     driver = baslat_driver()
                     driver.get(f"https://dergipark.org.tr/tr/search?q={dp_kelime}&section=article")
                     
-                    # Bekleme süresi arttırıldı
                     time.sleep(5)
                     
                     results = []
-                    # CSS selector güncellendi
                     items = driver.find_elements("css selector", "h5.card-title a")
                     for item in items[:15]:
                         results.append({"title": item.text, "link": item.get_attribute("href")})
@@ -245,7 +253,6 @@ with tab2:
                                     try:
                                         headers = {'User-Agent': 'Mozilla/5.0'}
                                         req = requests.get(r['link'], headers=headers)
-                                        # Basit PDF bulucu
                                         match = re.search(r'/tr/download/article-file/\d+', req.text)
                                         if match:
                                             pdf_url = "https://dergipark.org.tr" + match.group(0)
