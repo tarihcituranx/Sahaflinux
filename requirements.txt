@@ -5,3 +5,4 @@ pytesseract
 pandas
 webdriver-manager
 selenium
+bs4
