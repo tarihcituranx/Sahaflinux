@@ -8,12 +8,11 @@ from io import BytesIO
 import zipfile
 from bs4 import BeautifulSoup
 import urllib3
-import cloudscraper # Bot korumasını aşmak için şart
+import cloudscraper
 
 # SSL Uyarılarını Sustur
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide")
 
 # --- SESSION STATE ---
@@ -25,8 +24,9 @@ if 'dp_results' not in st.session_state:
 # --- YAN MENÜ ---
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
-    st.success("✅ HTU: Agresif Tarama Aktif")
-    st.success("✅ DergiPark: Meta-Tag Yakalayıcı Aktif")
+    st.success("✅ HTU: Agresif Mod")
+    st.info("✅ DergiPark: Cloudscraper Session")
+    debug_mode = st.checkbox("🐞 Debug Modu (Hata Gör)", value=False)
     st.markdown("---")
 
 # --- YARDIMCI: URL DÜZELTİCİ ---
@@ -40,7 +40,7 @@ def fix_url(link):
     return link
 
 # ========================================================
-# 1. HTU ARŞİVİ (ÇALIŞAN SÜRÜM - DOKUNULMADI)
+# 1. HTU ARŞİVİ (KUSURSUZ ÇALIŞAN VERSİYON)
 # ========================================================
 @st.cache_data(ttl=3600)
 def htu_verilerini_getir():
@@ -87,7 +87,6 @@ def htu_verilerini_getir():
         except Exception as e: st.error(f"HTU Hatası: {e}")
     
     status_text.empty()
-    # Tekrarları temizle
     df = pd.DataFrame(all_data)
     if not df.empty: df = df.drop_duplicates(subset=['HTU NO.'])
     return df
@@ -100,7 +99,7 @@ def download_and_process_djvu(url, filename):
 
 
 # ========================================================
-# 2. DERGİPARK (YENİ STRATEJİ: META TAG YÖNTEMİ)
+# 2. DERGİPARK (OTURUM KORUMALI İNDİRİCİ)
 # ========================================================
 
 def search_dergipark_brave(keyword, count=15):
@@ -133,73 +132,77 @@ def search_dergipark_brave(keyword, count=15):
 
 def fetch_pdf_smart(article_url):
     """
-    Selenium yerine Cloudscraper + Meta Tag okuma yöntemi.
-    Daha hızlı, hatasız ve bot korumasına takılmaz.
+    Cloudscraper ile kalıcı oturum açarak indirme yapar.
     """
     status_box = st.empty()
-    status_box.info("🚀 Makale sayfasına bağlanılıyor...")
+    status_box.info("🚀 Sunucuya bağlanılıyor...")
 
-    # Cloudscraper oluştur (Bot korumasını geçmek için)
+    # Bot korumasını aşan özel scraper
     scraper = cloudscraper.create_scraper(
         browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
     )
 
     try:
-        # 1. Makale Sayfasını Çek
+        # 1. ADIM: Makale sayfasına gir (Cookie kazanmak için)
+        if debug_mode: status_box.warning(f"Sayfa isteniyor: {article_url}")
+        
         response = scraper.get(article_url, timeout=20)
         
         if response.status_code != 200:
-            status_box.error(f"Sayfaya girilemedi (Kod: {response.status_code})")
+            status_box.error(f"Sayfa açılamadı (Kod: {response.status_code})")
             return None
 
         soup = BeautifulSoup(response.text, 'lxml')
 
-        # 2. YÖNTEM A: Meta Etiketinden PDF Linkini Al (En Temiz Yol)
-        # DergiPark, Google Scholar için <meta name="citation_pdf_url" content="..."> kullanır.
-        meta_pdf = soup.find("meta", {"name": "citation_pdf_url"})
-        
+        # 2. ADIM: İndirme Linkini Bul (Tüm A etiketlerini tara)
         pdf_link = None
-        if meta_pdf and meta_pdf.get("content"):
-            pdf_link = meta_pdf["content"]
-            status_box.info("✅ PDF Meta Etiketi bulundu!")
         
-        # 3. YÖNTEM B: Eğer Meta yoksa, butonun içini ara
+        # Yöntem A: Meta Etiketi
+        meta_tag = soup.find("meta", {"name": "citation_pdf_url"})
+        if meta_tag:
+            pdf_link = meta_tag.get("content")
+            if debug_mode: status_box.info("Meta etiketi bulundu.")
+        
+        # Yöntem B: Sayfadaki Linkleri Tara
         if not pdf_link:
-            status_box.info("⚠️ Meta etiketi yok, buton aranıyor...")
-            # href içinde download/article-file geçen butonu bul
-            btn = soup.find('a', href=re.compile(r'download\/article-file\/\d+'))
-            if btn:
-                pdf_link = fix_url(btn['href'])
-                status_box.info("✅ İndirme butonu bulundu!")
+            # İçinde 'download/article-file' geçen herhangi bir linki bul
+            all_links = soup.find_all('a', href=True)
+            for link in all_links:
+                href = link['href']
+                if 'download/article-file' in href:
+                    pdf_link = href
+                    if debug_mode: status_box.info("Buton linki bulundu.")
+                    break
+        
+        if not pdf_link:
+            status_box.error("❌ Sayfada PDF linki gizlenmiş veya bulunamadı.")
+            return None
 
-        # 4. İndirme İşlemi
-        if pdf_link:
-            # Linkin doğru formatta olduğundan emin ol
-            pdf_link = fix_url(pdf_link)
-            
-            status_box.info(f"📥 İndiriliyor: {pdf_link}")
-            
-            # Referer Header ekle (404 hatasını çözer)
-            headers = {
-                "Referer": article_url,
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            }
-            
-            pdf_response = scraper.get(pdf_link, headers=headers, stream=True)
-            
-            if pdf_response.status_code == 200:
-                # Boyut kontrolü
-                if len(pdf_response.content) < 2000:
-                    status_box.error("⚠️ İndirilen dosya hatalı (Boyut çok küçük).")
-                    return None
-                
-                status_box.empty()
-                return pdf_response.content
-            else:
-                status_box.error(f"İndirme başarısız (Kod: {pdf_response.status_code})")
+        # Linki Düzelt
+        final_pdf_url = fix_url(pdf_link)
+        if debug_mode: status_box.warning(f"İndirilecek Link: {final_pdf_url}")
+
+        # 3. ADIM: İndir (Referer Header ÇOK ÖNEMLİ)
+        headers = {
+            "Referer": article_url, # "Ben bu sayfadan geliyorum" demezsen 404 verir
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+
+        status_box.info("📥 Dosya indiriliyor...")
+        pdf_response = scraper.get(final_pdf_url, headers=headers, stream=True)
+
+        if pdf_response.status_code == 200:
+            # Dosya boyutu kontrolü (Hata sayfası mı indirdik?)
+            file_size = len(pdf_response.content)
+            if file_size < 2000:
+                if debug_mode: status_box.error(f"Hata: Dosya boyutu çok küçük ({file_size} byte). Muhtemelen HTML indi.")
+                else: status_box.warning("İndirilen dosya PDF değil gibi görünüyor.")
                 return None
+            
+            status_box.empty()
+            return pdf_response.content
         else:
-            status_box.error("❌ Sayfada PDF linki bulunamadı.")
+            status_box.error(f"İndirme başarısız. Sunucu Kodu: {pdf_response.status_code}")
             return None
 
     except Exception as e:
@@ -218,7 +221,7 @@ with tab1:
     col1, col2 = st.columns([4,1])
     search_term = col1.text_input("HTU Yayını Ara (NO veya İsim):", placeholder="Örn: 2662, Tanin...")
     
-    with st.spinner("Tüm arşiv (Agresif Mod) taranıyor..."):
+    with st.spinner("Tüm arşiv taranıyor..."):
         df = htu_verilerini_getir()
     
     if not df.empty:
@@ -284,7 +287,6 @@ with tab2:
                 with col_a:
                     if unique_key not in st.session_state.dergipark_cache:
                         if st.button("📥 PDF Hazırla", key=f"btn_{unique_key}"):
-                            # YENİ FONKSİYONU KULLANIYORUZ
                             pdf_data = fetch_pdf_smart(makale['link'])
                             if pdf_data:
                                 st.session_state.dergipark_cache[unique_key] = pdf_data
