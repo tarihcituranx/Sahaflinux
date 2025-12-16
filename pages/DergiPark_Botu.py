@@ -10,13 +10,14 @@ from bs4 import BeautifulSoup
 import urllib3
 import cloudscraper
 
-# SSL Uyarılarını Sustur
+# SSL Uyarılarını Sustur (Konsol kirliliğini önler)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide")
 
 # --- SESSION STATE (HAFIZA) ---
+# Butonların tıklanınca kaybolmaması için verileri burada tutuyoruz
 if 'dergipark_cache' not in st.session_state:
     st.session_state.dergipark_cache = {}
 if 'dp_results' not in st.session_state:
@@ -25,13 +26,16 @@ if 'dp_results' not in st.session_state:
 # --- YAN MENÜ ---
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
-    # Eğer bu dosyayı tek başına çalıştırıyorsan bu linki kaldırabilirsin
+    # Eğer bu sayfayı 'pages' klasörü altında kullanıyorsan aşağıdaki linki aktif et:
     # st.page_link("app.py", label="⬅️ Ana Sayfaya Dön", icon="↩️")
+    st.info("Bu modül Cloudscraper kullanarak bot korumasını aşar.")
     st.markdown("---")
 
 st.title("🌍 Harici Kaynaklar & Canlı Arama")
 
-# --- HTU FONKSİYONLARI (DEĞİŞMEDİ) ---
+# ==========================================
+# 1. HTU ARŞİVİ FONKSİYONLARI
+# ==========================================
 @st.cache_data(ttl=3600)
 def htu_verilerini_getir():
     base_url = "https://www.tufs.ac.jp/common/fs/asw/tur/htu/"
@@ -64,7 +68,7 @@ def htu_verilerini_getir():
                                 "AÇIKLAMA": cols[3].get_text(strip=True), 
                                 "LINK": full_link
                             })
-        except Exception as e: st.error(f"Hata: {e}")
+        except Exception as e: st.error(f"HTU Veri Hatası: {e}")
     return pd.DataFrame(all_data)
 
 def download_and_process_djvu(url, filename):
@@ -73,11 +77,14 @@ def download_and_process_djvu(url, filename):
         return (r.content, "OK") if r.status_code == 200 else (None, "Bulunamadı")
     except Exception as e: return None, str(e)
 
-# --- DERGİPARK FONKSİYONLARI (GÜÇLENDİRİLDİ) ---
+# ==========================================
+# 2. DERGİPARK FONKSİYONLARI (GÜÇLENDİRİLMİŞ)
+# ==========================================
 
 def search_dergipark_brave(keyword, count=15):
+    """Brave API ile DergiPark içinde arama yapar."""
     try: api_key = st.secrets["BRAVE_API_KEY"]
-    except: st.error("⚠️ API Anahtarı eksik!"); return []
+    except: st.error("⚠️ API Anahtarı eksik! secrets.toml dosyasını kontrol edin."); return []
 
     url = "https://api.search.brave.com/res/v1/web/search"
     query = f'site:dergipark.org.tr/tr/pub "{keyword}"'
@@ -93,9 +100,11 @@ def search_dergipark_brave(keyword, count=15):
                 for item in data["web"]["results"]:
                     link = item["url"]
                     
-                    # URL YAPI DÜZELTİCİ (Link Fixer)
-                    # Bazen Brave eksik link verebilir, formatı kontrol etmeyelim, 
-                    # Scraper yönlendirmeyi takip etsin.
+                    # --- LİNK FİLTRESİ ---
+                    # Dergi adı olmayan hatalı linkleri (örn: /pub/article/123) eliyoruz.
+                    # Doğru format: /pub/DERGI_ADI/article/123
+                    if "/pub/article/" in link:
+                        continue 
                     
                     results.append({
                         "title": item["title"],
@@ -103,87 +112,95 @@ def search_dergipark_brave(keyword, count=15):
                         "desc": item.get("description", "")
                     })
             return results
-    except Exception as e: st.error(f"Hata: {e}")
+    except Exception as e: st.error(f"Arama Hatası: {e}")
     return []
 
 def fetch_pdf_content(article_url):
     """
-    Makale sayfasına gider, doğru indirme butonunu bulur ve PDF'i indirir.
-    Regex yerine BeautifulSoup kullanarak hata payını sıfıra indirir.
+    404 Hatasını çözen özel indirme fonksiyonu.
+    Referer Header ve Cloudscraper kullanır.
     """
-    # Cloudscraper, bot korumasını (Cloudflare) aşmak için şart
-    scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True})
+    # Cloudflare korumasını aşmak için scraper oluştur
+    scraper = cloudscraper.create_scraper(
+        browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+    )
     
     try:
         # 1. Makale Sayfasına Git
-        # Scraper, yönlendirmeleri (redirect) otomatik takip eder. 
-        # Yani link bozuk olsa bile DergiPark yönlendiriyorsa doğru yere gideriz.
         response = scraper.get(article_url, timeout=20)
         
         if response.status_code != 200:
-            st.error(f"Sayfaya erişilemedi (Kod: {response.status_code})")
+            st.error(f"Makale sayfasına girilemedi. Kod: {response.status_code}")
             return None
 
-        # 2. Sayfayı Analiz Et (HTML Parse)
+        # 2. Sayfadaki Gerçek İndirme Linkini Bul (BeautifulSoup)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # 3. İndirme Linkini Bul (Senin istediğin formatı arıyoruz)
-        # Hedef Format: /tr/download/article-file/2147451 veya /download/article-file/...
-        # 'href' içinde 'download/article-file/' geçen tüm linkleri bul
+        # 'href' içinde 'download/article-file' geçen linki bul
         download_tag = soup.find('a', href=re.compile(r'download\/article-file\/\d+'))
         
         if download_tag:
             pdf_path = download_tag['href']
             
-            # Link göreceli ise (başında https yoksa) tamamla
+            # Link göreceli ise (https yoksa) tamamla
             if not pdf_path.startswith("http"):
-                # Başında / yoksa ekle
-                if not pdf_path.startswith("/"):
-                    pdf_path = "/" + pdf_path
+                if not pdf_path.startswith("/"): pdf_path = "/" + pdf_path
                 pdf_link = "https://dergipark.org.tr" + pdf_path
             else:
                 pdf_link = pdf_path
 
-            # 4. PDF'i İndir
-            pdf_response = scraper.get(pdf_link, timeout=20)
+            # 3. HEADER EKLEME (404 ÇÖZÜMÜ)
+            # Sunucuya "Ben bu makale sayfasından geliyorum" diyoruz.
+            headers = {
+                "Referer": article_url,  # <--- BU SATIR ÇOK ÖNEMLİ
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
             
-            # İçerik PDF mi kontrol et
-            content_type = pdf_response.headers.get('Content-Type', '')
-            if 'pdf' in content_type.lower() or len(pdf_response.content) > 1000:
+            # 4. PDF İndir
+            pdf_response = scraper.get(pdf_link, headers=headers, timeout=30)
+            
+            # İçeriğin PDF olup olmadığını kontrol et
+            if pdf_response.status_code == 200 and b"%PDF" in pdf_response.content[:10]:
                 return pdf_response.content
             else:
-                st.warning("İndirilen dosya PDF formatında görünmüyor.")
+                st.warning("İndirilen dosya PDF değil. Erişim kısıtlanmış olabilir.")
                 return None
         else:
-            st.warning("Bu sayfada uygun formatta bir indirme linki bulunamadı.")
+            st.warning("Sayfada uygun formatta bir indirme butonu bulunamadı.")
             return None
 
     except Exception as e:
-        st.error(f"Bağlantı hatası: {e}")
+        st.error(f"İndirme işleminde hata: {e}")
     
     return None
 
-# --- ARAYÜZ SEKMELERİ ---
+# ==========================================
+# ARAYÜZ SEKMELERİ
+# ==========================================
 tab1, tab2 = st.tabs(["📜 HTU Arşivi", "🤖 DergiPark Botu"])
 
-# SEKME 1: HTU
+# --- SEKME 1: HTU ---
 with tab1:
     st.header("📜 HTU Dijital Süreli Yayınlar")
     col1, col2 = st.columns([4,1])
     search_term = col1.text_input("HTU Yayını Ara:", placeholder="Örn: Tanin...")
     
-    with st.spinner("Veritabanı taranıyor..."):
+    with st.spinner("Tokyo Üniversitesi veritabanı taranıyor..."):
         df = htu_verilerini_getir()
     
     if not df.empty:
         if search_term:
             df = df[df['BAŞLIK'].str.contains(search_term, case=False) | df['HTU NO.'].str.contains(search_term, case=False)]
         
-        st.write(f"{len(df)} kayıt.")
+        st.write(f"{len(df)} kayıt listeleniyor.")
         df.insert(0, "Seç", False)
+        
         edited_df = st.data_editor(
             df,
-            column_config={"Seç": st.column_config.CheckboxColumn("İndir", default=False), "LINK": st.column_config.LinkColumn("Görüntüle")},
+            column_config={
+                "Seç": st.column_config.CheckboxColumn("İndir", default=False),
+                "LINK": st.column_config.LinkColumn("Görüntüle")
+            },
             hide_index=True, use_container_width=True, key="htu_editor"
         )
         
@@ -191,30 +208,37 @@ with tab1:
         if not selected_rows.empty and st.button("📦 Seçilenleri İndir (ZIP)", type="primary"):
             progress_bar = st.progress(0)
             zip_buffer = BytesIO()
+            
             with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zf:
                 for idx, row in enumerate(selected_rows.itertuples()):
                     safe_title = re.sub(r'[\\/*?:"<>|]', "", row.BAŞLIK)[:40]
+                    
                     if row.LINK.endswith(".djvu"):
                         c, m = download_and_process_djvu(row.LINK, safe_title)
                         if c: zf.writestr(f"{safe_title}.djvu", c)
-                    else: zf.writestr(f"{safe_title}_LINK.txt", f"Link: {row.LINK}")
+                        else: zf.writestr(f"{safe_title}_HATA.txt", m)
+                    else:
+                        zf.writestr(f"{safe_title}_LINK.txt", f"Bu bir klasör veya HTML sayfasıdır: {row.LINK}")
+                    
                     progress_bar.progress((idx + 1) / len(selected_rows))
+            
+            st.success("ZIP dosyası hazır!")
             st.download_button("💾 ZIP Kaydet", zip_buffer.getvalue(), "HTU_Arsiv.zip", "application/zip")
 
-# SEKME 2: DERGİPARK (TAMİR EDİLDİ)
+# --- SEKME 2: DERGİPARK ---
 with tab2:
     st.header("🤖 DergiPark Makale Avcısı")
-    st.info("Brave ile bulur, Cloudscraper ile bot korumasını aşarak PDF indirir.")
+    st.caption("Brave API ile bulur, Cloudscraper ile indirir (404 Korumalı).")
 
     with st.form("dp_form"):
         col1, col2 = st.columns([4,1])
         dp_kelime = col1.text_input("Makale Ara:", placeholder="Örn: Milli Mücadele...")
         dp_btn = col2.form_submit_button("🚀 Ara")
 
-    # ARAMA MANTIĞI
+    # ARAMA İŞLEMİ
     if dp_btn and dp_kelime:
-        st.session_state.dergipark_cache = {} 
-        with st.spinner("🦁 Arşiv taranıyor..."):
+        st.session_state.dergipark_cache = {} # Yeni aramada eski indirmeleri temizle
+        with st.spinner("🦁 Brave arşivleri tarıyor..."):
             st.session_state.dp_results = search_dergipark_brave(dp_kelime)
 
     # SONUÇLARI GÖSTER
@@ -226,25 +250,27 @@ with tab2:
                 st.write(f"_{makale['desc']}_")
                 
                 col_a, col_b = st.columns([1, 3])
-                unique_key = f"dp_{i}"
+                unique_key = f"dp_{i}" # Her satır için benzersiz ID
                 
                 with col_a:
-                    # DURUM 1: Dosya henüz indirilmedi
+                    # 1. DURUM: Dosya Henüz İndirilmedi
                     if unique_key not in st.session_state.dergipark_cache:
                         if st.button("📥 PDF Hazırla", key=f"btn_{unique_key}"):
                             with st.spinner("PDF Sunucudan Çekiliyor..."):
-                                # Link bozuk bile olsa fetch_pdf_content içindeki scraper onu çözer
                                 pdf_data = fetch_pdf_content(makale['link'])
                                 
                                 if pdf_data:
+                                    # Hafızaya kaydet ve sayfayı yenile
                                     st.session_state.dergipark_cache[unique_key] = pdf_data
                                     st.rerun()
                                 else:
-                                    st.error("Dosya bulunamadı veya erişim kısıtlı.")
+                                    st.error("Dosya indirilemedi.")
                     
-                    # DURUM 2: Dosya hazır, İndirme Butonu
+                    # 2. DURUM: Dosya İndirildi, Kaydet Butonunu Göster
                     else:
-                        clean_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:30] + ".pdf"
+                        # Dosya adındaki geçersiz karakterleri temizle
+                        clean_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:40] + ".pdf"
+                        
                         st.download_button(
                             label="💾 PDF İNDİR",
                             data=st.session_state.dergipark_cache[unique_key],
