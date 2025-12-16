@@ -20,14 +20,9 @@ except:
 
 # --- METİN TEMİZLEME FONKSİYONU ---
 def clean_ocr_text(text):
-    """OCR metinlerindeki bozuklukları temizler."""
-    if not text:
-        return ""
-    # Tire ile bölünmüş kelimeleri birleştir
+    if not text: return ""
     text = re.sub(r'-\s+', '', text)
-    # Fazla boşlukları temizle
     text = re.sub(r'\s+', ' ', text)
-    # Yaygın OCR hataları
     replacements = {
         " v e ": " ve ", " b ir ": " bir ", " b u ": " bu ", 
         " d e ": " de ", " d a ": " da ", " n e ": " ne ",
@@ -37,50 +32,60 @@ def clean_ocr_text(text):
         text = text.replace(old, new)
     return text.strip()
 
-# --- YARDIMCI: DOSYA İSMİ VARYASYONLARI ---
+# --- KRİTİK GÜNCELLEME: DOSYA İSMİ VARYASYONLARI ---
 def generate_variations(date_str, page_num, suffix):
     """
     Sunucudaki olası dosya isimlerini üretir.
-    Örn: 1957-09-01 veya 1957-9-1
+    Örn: URL'de sayfa 1 ise, dosya 0.jpg olabilir.
     """
     variations = []
     try:
         y, m, d = date_str.split("-")
+        p_num = int(page_num)
         
-        # 1. Standart (1957-09-10-1...)
-        variations.append(f"{date_str}-{page_num}{suffix}")
+        # --- EN ÖNEMLİ EKLEMELER BURADA ---
         
-        # 2. Sıfırsız Tarih (1957-9-10-1...)
-        variations.append(f"{y}-{int(m)}-{int(d)}-{page_num}{suffix}")
+        # 1. İhtimal: Sayfa numarasının 1 eksiği (0 tabanlı indeksleme)
+        # Senin örneğindeki gibi URL'de 1 yazıp dosyada 0 yazıyorsa bunu yakalar.
+        if p_num > 0:
+            variations.append(f"{date_str}-{p_num - 1}{suffix}")          # 1957-09-10-0.jpg
+            variations.append(f"{date_str}-{p_num - 1:02d}{suffix}")      # 1957-09-10-00.jpg
+
+        # 2. İhtimal: Standart (Aynısı)
+        variations.append(f"{date_str}-{p_num}{suffix}")                  # 1957-09-10-1.jpg
         
-        # 3. Sıfırlı Sayfa (1957-09-10-01...)
-        variations.append(f"{date_str}-{int(page_num):02d}{suffix}")
+        # 3. İhtimal: Sıfır dolgulu (01)
+        variations.append(f"{date_str}-{p_num:02d}{suffix}")              # 1957-09-10-01.jpg
         
-        # 4. Sıfırsız Tarih + Sıfırlı Sayfa
-        variations.append(f"{y}-{int(m)}-{int(d)}-{int(page_num):02d}{suffix}")
+        # 4. İhtimal: Sıfırsız Tarih (1957-9-10)
+        variations.append(f"{y}-{int(m)}-{int(d)}-{p_num}{suffix}")       # 1957-9-10-1.jpg
         
+        # 5. İhtimal: Sıfırsız Tarih + 1 Eksiği
+        if p_num > 0:
+            variations.append(f"{y}-{int(m)}-{int(d)}-{p_num - 1}{suffix}") # 1957-9-10-0.jpg
+
     except:
         pass
+    
+    # Debug için (Hangi linkleri denediğini görmek istersen açabilirsin)
+    # st.write(variations) 
     return variations
 
 # --- GÖRÜNTÜ VE PDF İŞLEMLERİ ---
 
 def get_cdn_image(gid, date_str, page_num):
-    """Resmi CDN'den çeker (Akıllı Deneme ile)"""
     base_url = "https://dzp35pmd4yqn4.cloudfront.net/thumbnails"
-    
-    # Olası isimler: ...-thumbnail250.jpg
     variations = generate_variations(date_str, page_num, "-thumbnail250.jpg")
     
     headers = {
-        "User-Agent": "Mozilla/5.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         "Referer": "https://www.gastearsivi.com/"
     }
 
     for filename in variations:
         url = f"{base_url}/{gid}/{filename}"
         try:
-            r = requests.get(url, headers=headers, timeout=3)
+            r = requests.get(url, headers=headers, timeout=2)
             if r.status_code == 200:
                 return Image.open(BytesIO(r.content))
         except:
@@ -88,10 +93,7 @@ def get_cdn_image(gid, date_str, page_num):
     return None
 
 def download_pdf(gid, date_str, page_num):
-    """PDF İndirir (Akıllı Deneme ile)"""
     base_url = "https://dzp35pmd4yqn4.cloudfront.net/sayfalar"
-    
-    # Olası isimler: ... .jpg (Sayfanın tam hali)
     variations = generate_variations(date_str, page_num, ".jpg")
     
     headers = {
@@ -102,11 +104,10 @@ def download_pdf(gid, date_str, page_num):
     for filename in variations:
         url = f"{base_url}/{gid}/{filename}"
         try:
-            # Önce dosya var mı diye hızlıca bak (stream=True)
-            r = requests.get(url, headers=headers, timeout=10, stream=True)
-            
+            # stream=True ile sadece varlığını kontrol et
+            r = requests.get(url, headers=headers, timeout=5, stream=True)
             if r.status_code == 200:
-                # Bulundu! İndir ve PDF yap
+                # Bulundu! İndir.
                 img = Image.open(BytesIO(r.content)).convert("L")
                 pdf_buffer = BytesIO()
                 img.save(pdf_buffer, format="PDF", resolution=100.0, quality=85)
@@ -114,13 +115,10 @@ def download_pdf(gid, date_str, page_num):
                 return pdf_buffer
         except:
             continue
-            
     return None
 
 # --- ARAMA FONKSİYONU ---
-
 def search_brave(keyword, count=20):
-    """Brave Search API"""
     url = "https://api.search.brave.com/res/v1/web/search"
     query = f'site:gastearsivi.com {keyword}'
     
@@ -141,7 +139,6 @@ def search_brave(keyword, count=20):
                 results = data["web"]["results"]
                 for r in results:
                     page_url = r["url"]
-                    # Metni al ve temizle
                     raw_desc = r.get("description", "") or r.get("title", "")
                     final_desc = clean_ocr_text(raw_desc)
                     
@@ -201,7 +198,6 @@ if results:
             c1, c2 = st.columns([1, 4])
             
             with c1:
-                # Küçük resim için de artık akıllı deneme yapılıyor
                 img = get_cdn_image(item['id'], item['date'], item['page'])
                 if img:
                     st.image(img, use_container_width=True)
@@ -219,7 +215,7 @@ if results:
                 with col_dl:
                     if unique_id not in st.session_state.pdf_cache:
                         if st.button(f"📥 PDF Hazırla", key=f"btn_{unique_id}"):
-                            with st.spinner("Arşiv taranıyor ve PDF hazırlanıyor..."):
+                            with st.spinner("Arşiv taranıyor (Varyasyonlar deneniyor)..."):
                                 pdf_data = download_pdf(item['id'], item['date'], item['page'])
                                 if pdf_data:
                                     st.session_state.pdf_cache[unique_id] = pdf_data
