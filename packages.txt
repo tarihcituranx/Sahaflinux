@@ -1,13 +1,8 @@
-tesseract-ocr
-libtesseract-dev
 chromium
 chromium-driver
-djvulibre-bin
-ghostscript
-chromium
-chromium-driver
-djvulibre-bin
-libgl1-mesa-glx
-poppler-utils
 tesseract-ocr
 tesseract-ocr-tur
+poppler-utils
+djvulibre-bin
+libgl1-mesa-glx
+ghostscript
