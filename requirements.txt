@@ -23,3 +23,5 @@ requests
 cloudscraper
 chromium
 chromium-driver
+rich
+streamlit
