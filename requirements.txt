@@ -12,3 +12,4 @@ yt-dlp
 googlesearch-python
 duckduckgo-search
 rich
+lxml
