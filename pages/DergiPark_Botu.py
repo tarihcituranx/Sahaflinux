@@ -5,23 +5,21 @@ from io import BytesIO
 import zipfile
 from bs4 import BeautifulSoup
 import urllib3
-import urllib.parse # URL Encode için gerekli
+import cloudscraper
+import re
 
 # SSL Uyarılarını Sustur
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide")
 
-# --- API ANAHTARI ---
-# Not: Bu anahtarın kotası dolarsa kod "Manuel İndir" butonunu gösterir.
-ZENROWS_API_KEY = "6f09eed1a045e0384a2e8aa817a155f0ade82187"
-
 # --- YAN MENÜ ---
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
-    st.success("✅ HTU: Agresif Mod")
-    st.success("✅ DergiPark: ZenRows + Manuel Fallback")
+    st.success("✅ HTU: Aktif")
+    st.info("✅ DergiPark: Tarayıcı Tabanlı İndirme")
     st.markdown("---")
+    st.caption("Bu modda doğrulama ekranı çıkarsa, yeni sekmede kendiniz doğrulayıp indirebilirsiniz.")
 
 # --- URL DÜZELTİCİ ---
 def fix_url(link):
@@ -34,7 +32,7 @@ def fix_url(link):
     return link
 
 # ========================================================
-# 1. HTU ARŞİVİ (STANDART)
+# 1. HTU ARŞİVİ (ZATEN ÇALIŞAN KISIM)
 # ========================================================
 @st.cache_data(ttl=3600)
 def htu_verilerini_getir():
@@ -48,9 +46,11 @@ def htu_verilerini_getir():
         try:
             r = requests.get(full_url, headers=headers, timeout=30, verify=False)
             r.encoding = 'utf-8' 
+            
             if r.status_code == 200:
                 try: soup = BeautifulSoup(r.content, 'lxml')
                 except: soup = BeautifulSoup(r.content, 'html.parser')
+
                 all_rows = soup.find_all('tr')
                 for row in all_rows:
                     try:
@@ -60,14 +60,21 @@ def htu_verilerini_getir():
                             htu_no = col_texts[1]
                             if "HTU NO" in htu_no or not htu_no: continue
                             if len(htu_no) > 20: continue
+
                             baslik = col_texts[2] if len(cols) > 2 else ""
                             aciklama = col_texts[3] if len(cols) > 3 else ""
+
                             link_tag = cols[2].find('a')
                             raw_link = link_tag['href'] if link_tag and link_tag.has_attr('href') else ""
                             full_link = base_url + raw_link if raw_link and not raw_link.startswith("http") else raw_link
-                            all_data.append({"HTU NO.": htu_no, "BAŞLIK": baslik, "AÇIKLAMA": aciklama, "LINK": full_link})
+                            
+                            all_data.append({
+                                "HTU NO.": htu_no, "BAŞLIK": baslik,
+                                "AÇIKLAMA": aciklama, "LINK": full_link
+                            })
                     except: continue
         except Exception as e: st.error(f"HTU Hatası: {e}")
+    
     df = pd.DataFrame(all_data)
     if not df.empty: df = df.drop_duplicates(subset=['HTU NO.'])
     return df
@@ -80,7 +87,7 @@ def download_and_process_djvu(url, filename):
 
 
 # ========================================================
-# 2. DERGİPARK (ZENROWS + MANUEL YEDEK)
+# 2. DERGİPARK (LİNK BULUCU MOD)
 # ========================================================
 
 def search_dergipark_brave(keyword, count=15):
@@ -111,78 +118,31 @@ def search_dergipark_brave(keyword, count=15):
     except Exception as e: st.error(f"Arama Hatası: {e}")
     return []
 
-def fetch_pdf_zenrows_direct(article_url):
+def get_real_pdf_link(article_url):
     """
-    ZenRows API ile PDF indirir. Hata alırsa 'MANUAL_MODE' döndürür.
-    Böylece kullanıcı butona basıp kendi indirebilir.
+    Sadece linki bulur. İndirmeyi kullanıcıya bırakır.
     """
-    status_box = st.empty()
-    status_box.info("🚀 ZenRows ile bağlanılıyor...")
-    
-    zenrows_url = "https://api.zenrows.com/v1/"
-    
-    # 1. ADIM: URL'yi Güvenli Hale Getir (Encode)
-    # ?issue_id=... gibi parametrelerin ZenRows'u bozmasını engeller.
-    encoded_url = urllib.parse.quote(article_url, safe='') 
-
-    params_html = {
-        'url': article_url, # Requests kütüphanesi bunu halleder ama biz garantiye alalım
-        'apikey': ZENROWS_API_KEY,
-        'js_render': 'true',
-        'antibot': 'true',
-        'premium_proxy': 'true', # 404 hatalarını azaltmak için
-        'country': 'tr' # Türkiye IP'si kullanmaya çalış
-    }
-    
+    scraper = cloudscraper.create_scraper()
     try:
-        # Siteye Git (HTML Çek)
-        response = requests.get(zenrows_url, params=params_html)
-        
-        # Eğer ZenRows hata verirse (404, 403, Kota Bitti vb.)
-        if response.status_code != 200:
-            status_box.warning(f"Otomatik indirme yapılamadı (Hata: {response.status_code}). Manuel moda geçiliyor...")
-            return "MANUAL_MODE", None # Hata durumunda manuel moda geç
-            
+        # Sadece HTML'i çekip linki ayıklayacağız
+        response = scraper.get(article_url, timeout=10)
         soup = BeautifulSoup(response.text, 'lxml')
         
-        # PDF Linkini Bul
-        pdf_link = None
+        # 1. Öncelik: Meta Etiketi (En temiz link buradadır)
         meta_tag = soup.find("meta", {"name": "citation_pdf_url"})
         if meta_tag:
-            pdf_link = meta_tag.get("content")
-        else:
-            all_links = soup.find_all('a', href=True)
-            for link in all_links:
-                if 'download/article-file' in link['href']:
-                    pdf_link = link['href']
-                    break
+            return fix_url(meta_tag.get("content"))
         
-        if not pdf_link:
-            status_box.warning("PDF linki sayfada bulunamadı. Siteye gitmeyi deneyin.")
-            return "MANUAL_MODE", None
-            
-        final_pdf_url = fix_url(pdf_link)
-        status_box.info(f"✅ Link bulundu! İndiriliyor...")
-        
-        # 2. ADIM: PDF'i İndir
-        params_pdf = {
-            'url': final_pdf_url,
-            'apikey': ZENROWS_API_KEY,
-            'antibot': 'true',
-        }
-        
-        pdf_response = requests.get(zenrows_url, params=params_pdf)
-        
-        if pdf_response.status_code == 200:
-            status_box.empty()
-            return "SUCCESS", pdf_response.content
-        else:
-            status_box.warning("PDF indirilirken bağlantı koptu. Manuel moda geçiliyor.")
-            return "MANUAL_MODE", final_pdf_url
-
+        # 2. Öncelik: Buton
+        all_links = soup.find_all('a', href=True)
+        for link in all_links:
+            if 'download/article-file' in link['href']:
+                return fix_url(link['href'])
+                
     except Exception as e:
-        status_box.error(f"Sistem Hatası: {e}")
-        return "MANUAL_MODE", None
+        # Hata olsa bile en azından makale linkini döndür, kullanıcı oradan indirsin
+        return None
+    return None
 
 # ========================================================
 # ARAYÜZ
@@ -233,7 +193,7 @@ with tab1:
                     progress_bar.progress((idx + 1) / len(selected_rows))
             st.download_button("💾 ZIP Kaydet", zip_buffer.getvalue(), "HTU_Arsiv.zip", "application/zip")
 
-# --- SEKME 2: DERGİPARK (ZENROWS + FALLBACK) ---
+# --- SEKME 2: DERGİPARK (LİNK MODU) ---
 with tab2:
     st.header("🤖 DergiPark Makale Avcısı")
     with st.form("dp_form"):
@@ -244,10 +204,12 @@ with tab2:
     if 'dp_results' not in st.session_state:
         st.session_state.dp_results = []
     
-    if 'dergipark_cache' not in st.session_state:
-        st.session_state.dergipark_cache = {}
+    # Bulunan linkleri hafızada tutmak için
+    if 'found_links' not in st.session_state:
+        st.session_state.found_links = {}
 
     if dp_btn and dp_kelime:
+        st.session_state.found_links = {} # Yeni aramada temizle
         with st.spinner("🦁 Brave arşivleri tarıyor..."):
             st.session_state.dp_results = search_dergipark_brave(dp_kelime)
 
@@ -262,32 +224,26 @@ with tab2:
                 unique_key = f"dp_{i}"
                 
                 with col_a:
-                    # Dosya zaten hafızadaysa indir
-                    if unique_key in st.session_state.dergipark_cache:
-                        data, mode, link = st.session_state.dergipark_cache[unique_key]
-                        
-                        if mode == "SUCCESS":
-                            clean_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:30] + ".pdf"
-                            st.download_button("💾 PDF İNDİR", data, clean_name, "application/pdf", key=f"dl_{unique_key}", type="primary")
-                        elif mode == "MANUAL":
-                            # ZenRows patladıysa burası çalışır
-                            st.warning("Bot koruması aşılamadı.")
-                            st.link_button("📥 PDF'İ KENDİN İNDİR", link if link else makale['link'], type="primary")
+                    # Eğer linki daha önce bulduysak direkt butonu göster
+                    if unique_key in st.session_state.found_links:
+                        final_link = st.session_state.found_links[unique_key]
+                        st.link_button("📥 PDF'İ İNDİR (Yeni Sekme)", final_link, type="primary")
                     
-                    # Henüz işlem yapılmadıysa
+                    # Henüz bulmadıysak "Hazırla" butonu göster
                     else:
-                        if st.button("📥 PDF Hazırla", key=f"btn_{unique_key}"):
-                            status, content = fetch_pdf_zenrows_direct(makale['link'])
-                            
-                            if status == "SUCCESS":
-                                st.session_state.dergipark_cache[unique_key] = (content, "SUCCESS", None)
-                                st.rerun()
-                            else:
-                                # Hata aldıysak, bulunan linki (varsa) veya ana linki kaydet
-                                st.session_state.dergipark_cache[unique_key] = (None, "MANUAL", content) # content burada link oluyor
-                                st.rerun()
+                        if st.button("🔍 PDF Linkini Bul", key=f"btn_{unique_key}"):
+                            with st.spinner("Link çözümleniyor..."):
+                                pdf_link = get_real_pdf_link(makale['link'])
+                                
+                                if pdf_link:
+                                    st.session_state.found_links[unique_key] = pdf_link
+                                    st.rerun() # Sayfayı yenile ve butonu getir
+                                else:
+                                    st.error("PDF linki gizli.")
+                                    # Linki bulamazsa bari makale linkini verelim
+                                    st.link_button("Siteye Git ve İndir", makale['link'])
 
                 with col_b:
-                    st.markdown(f"👉 **[Siteye Git]({makale['link']})**")
+                    st.markdown(f"👉 **[Makale Sayfasına Git]({makale['link']})**")
     elif dp_btn:
         st.warning("Sonuç bulunamadı.")
