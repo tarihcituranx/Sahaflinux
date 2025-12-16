@@ -13,3 +13,4 @@ googlesearch-python
 duckduckgo-search
 rich
 lxml
+curl_cffi
