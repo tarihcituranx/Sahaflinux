@@ -2,92 +2,89 @@ import streamlit as st
 from datetime import datetime
 import time
 
-# Sayfa Ayarları (Geniş mod ve başlık)
+# Sayfa Ayarları
 st.set_page_config(page_title="2026 Sınav Sayacı", page_icon="⏱️", layout="wide")
 
-# --- ÖZEL CSS TASARIMI ---
-# Bu kısım kartların, gölgelerin ve renklerin ayarlandığı yerdir.
+# --- CSS GÜNCELLEMESİ (Dark Mode Sorunu Çözüldü) ---
 st.markdown("""
     <style>
-    /* Ana kapsayıcı ayarları */
+    /* Ana kapsayıcı */
     .main-container {
-        font-family: 'Helvetica', sans-serif;
+        font-family: 'Arial', sans-serif;
     }
     
-    /* Kart Tasarımı */
+    /* Kart Tasarımı - Renkleri sabitledik */
     .exam-card {
-        background-color: #ffffff;
-        border-radius: 15px;
+        background-color: #ffffff !important; /* Arka plan hep BEYAZ */
+        border-radius: 12px;
         padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease;
-        border-left: 10px solid #ccc; /* Varsayılan sol çizgi */
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-left: 8px solid #ccc;
     }
     
-    .exam-card:hover {
-        transform: scale(1.02);
-    }
-
-    /* Sınav Başlığı */
+    /* Başlık Rengi - Hep SİYAH (Dark modda beyaz olmasın diye) */
     .exam-title {
-        font-size: 22px;
-        font-weight: 700;
-        color: #333;
+        font-size: 20px;
+        font-weight: bold;
+        color: #000000 !important; 
         margin: 0;
+        padding-top: 5px;
     }
     
-    /* Tarih */
+    /* Tarih Rengi - Hep KOYU GRİ */
     .exam-date {
         font-size: 14px;
-        color: #666;
-        margin-bottom: 15px;
+        color: #555555 !important;
+        margin-bottom: 10px;
     }
 
-    /* Sayaç Metni */
+    /* Sayaç Metni - Hep KOYU LACİVERT */
     .countdown-text {
-        font-size: 28px;
+        font-size: 24px;
         font-weight: 800;
-        font-family: 'Courier New', monospace; /* Dijital saat hissi için */
-        color: #2c3e50;
+        font-family: 'Courier New', monospace;
+        color: #1e3799 !important;
     }
     
-    /* Sınav Türlerine Göre Renkler */
-    .border-ales { border-left-color: #e67e22 !important; } /* Turuncu */
-    .border-kpss { border-left-color: #e74c3c !important; } /* Kırmızı */
-    .border-meb { border-left-color: #3498db !important; }  /* Mavi */
-    
-    /* Küçük etiketler */
+    /* Etiket (Badge) Tasarımı */
     .badge {
-        padding: 5px 10px;
-        border-radius: 5px;
-        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
         font-size: 12px;
         font-weight: bold;
         float: right;
+        color: #ffffff !important; /* Etiket içi yazı hep BEYAZ */
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.2); /* Okunurluk için gölge */
     }
-    .bg-ales { background-color: #e67e22; }
-    .bg-kpss { background-color: #e74c3c; }
-    .bg-meb { background-color: #3498db; }
+    
+    /* Sınavlara özel renkler */
+    .border-ales { border-left-color: #e67e22 !important; }
+    .bg-ales { background-color: #e67e22 !important; } 
+    
+    .border-kpss { border-left-color: #c0392b !important; }
+    .bg-kpss { background-color: #c0392b !important; }
+    
+    .border-meb { border-left-color: #2980b9 !important; }
+    .bg-meb { background-color: #2980b9 !important; }
 
     </style>
     """, unsafe_allow_html=True)
 
-st.title("⏳ 2026 ÖSYM Sınav Takvimi & Geri Sayım")
-st.markdown("Sınavlara kalan süre **saniye saniye** aşağıda güncellenmektedir.")
+st.title("⏳ 2026 Sınav Geri Sayım")
+st.markdown("Sınav takvimi aşağıda **canlı** olarak işlemektedir.")
 st.divider()
 
-# --- SINAV VERİLERİ ---
+# --- SINAV LİSTESİ ---
 sinavlar = [
-    {"kod": "ales", "isim": "ALES/1", "tarih": "2026-05-10 10:15", "renk": "border-ales", "bg": "bg-ales"},
-    {"kod": "meb",  "isim": "MEB-AGS", "tarih": "2026-07-12 10:15", "renk": "border-meb",  "bg": "bg-meb"},
-    {"kod": "ales", "isim": "ALES/2", "tarih": "2026-07-26 10:15", "renk": "border-ales", "bg": "bg-ales"},
-    {"kod": "kpss", "isim": "KPSS Lisans", "tarih": "2026-09-06 10:15", "renk": "border-kpss", "bg": "bg-kpss"},
-    {"kod": "ales", "isim": "ALES/3", "tarih": "2026-11-29 10:15", "renk": "border-ales", "bg": "bg-ales"},
+    {"kod": "ALES", "isim": "ALES/1", "tarih": "2026-05-10 10:15", "renk": "border-ales", "bg": "bg-ales"},
+    {"kod": "MEB",  "isim": "MEB-AGS (Öğretmenlik)", "tarih": "2026-07-12 10:15", "renk": "border-meb",  "bg": "bg-meb"},
+    {"kod": "ALES", "isim": "ALES/2", "tarih": "2026-07-26 10:15", "renk": "border-ales", "bg": "bg-ales"},
+    {"kod": "KPSS", "isim": "KPSS Lisans", "tarih": "2026-09-06 10:15", "renk": "border-kpss", "bg": "bg-kpss"},
+    {"kod": "ALES", "isim": "ALES/3", "tarih": "2026-11-29 10:15", "renk": "border-ales", "bg": "bg-ales"},
 ]
 
 def format_time_remaining(target_date_str):
-    """Kalan süreyi hesaplar ve süslü bir string döndürür"""
     hedef = datetime.strptime(target_date_str, "%Y-%m-%d %H:%M")
     simdi = datetime.now()
     fark = hedef - simdi
@@ -101,36 +98,30 @@ def format_time_remaining(target_date_str):
     minutes = (seconds % 3600) // 60
     secs = seconds % 60
     
-    # Dijital saat formatı: 120 Gün - 05:12:43
-    return f"{days} GÜN &nbsp; <span style='color:#555'>|</span> &nbsp; {hours:02d}:{minutes:02d}:{secs:02d}", hedef
+    return f"{days} GÜN | {hours:02d}:{minutes:02d}:{secs:02d}", hedef
 
-# --- CANLI DÖNGÜ ALANI ---
-# Burası sihrin gerçekleştiği yer. 
-# st.empty() bir yer tutucu oluşturur, biz döngü içinde sürekli bu kutunun içini değiştiririz.
-
+# --- CANLI AKIŞ ---
 placeholder = st.empty()
 
 try:
     while True:
         with placeholder.container():
-            # Ekranı iki kolona bölelim (Geniş ekranlar için daha şık)
             col1, col2 = st.columns(2)
             
             for index, sinav in enumerate(sinavlar):
                 kalan_sure_str, hedef_dt = format_time_remaining(sinav["tarih"])
-                tarih_str = hedef_dt.strftime('%d.%m.%Y - Saat: %H:%M')
+                tarih_str = hedef_dt.strftime('%d.%m.%Y')
                 
-                # HTML KART YAPISI
+                # HTML KART
                 card_html = f"""
                 <div class="exam-card {sinav['renk']}">
-                    <span class="badge {sinav['bg']}">{sinav['kod'].upper()}</span>
-                    <h3 class="exam-title">{sinav['isim']}</h3>
-                    <div class="exam-date">📅 {tarih_str}</div>
+                    <span class="badge {sinav['bg']}">{sinav['kod']}</span>
+                    <div class="exam-title">{sinav['isim']}</div>
+                    <div class="exam-date">📅 {tarih_str} - Saat: 10:15</div>
                     <div class="countdown-text">{kalan_sure_str}</div>
                 </div>
                 """
                 
-                # Sınavları sırayla sol ve sağ kolona dağıt
                 if index % 2 == 0:
                     with col1:
                         st.markdown(card_html, unsafe_allow_html=True)
@@ -138,8 +129,7 @@ try:
                     with col2:
                         st.markdown(card_html, unsafe_allow_html=True)
         
-        # CPU'yu yormamak için 1 saniye bekle
         time.sleep(1)
 
 except KeyboardInterrupt:
-    print("Sayaç durduruldu.")
+    pass
