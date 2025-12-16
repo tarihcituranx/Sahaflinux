@@ -14,3 +14,4 @@ duckduckgo-search
 rich
 lxml
 curl_cffi
+zenrows
