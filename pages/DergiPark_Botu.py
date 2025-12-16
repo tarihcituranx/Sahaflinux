@@ -7,11 +7,11 @@ from bs4 import BeautifulSoup
 import urllib3
 import re
 
-# YENİ KÜTÜPHANE: Bot Koruması Delici
+# ZENROWS KÜTÜPHANESİ
 try:
-    from curl_cffi import requests as cffi_requests
+    from zenrows import ZenRowsClient
 except ImportError:
-    st.error("⚠️ `curl_cffi` kütüphanesi eksik! Lütfen requirements.txt dosyasına 'curl_cffi' ekleyin.")
+    st.error("⚠️ `zenrows` kütüphanesi eksik! requirements.txt dosyasına ekleyin.")
     st.stop()
 
 # SSL Uyarılarını Sustur
@@ -19,11 +19,15 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide")
 
+# --- API ANAHTARI ---
+# Normalde st.secrets içinden almalısın ama şimdilik senin verdiğini kullanıyoruz.
+ZENROWS_KEY = "6f09eed1a045e0384a2e8aa817a155f0ade82187"
+
 # --- YAN MENÜ ---
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
     st.success("✅ HTU: Agresif Mod")
-    st.info("✅ DergiPark: curl_cffi (TLS Impersonation)")
+    st.success("✅ DergiPark: ZenRows API (Premium)")
     st.markdown("---")
 
 # --- URL DÜZELTİCİ ---
@@ -37,7 +41,7 @@ def fix_url(link):
     return link
 
 # ========================================================
-# 1. HTU ARŞİVİ (ZATEN ÇALIŞAN KISIM - DOKUNULMADI)
+# 1. HTU ARŞİVİ (ZATEN ÇALIŞAN KISIM)
 # ========================================================
 @st.cache_data(ttl=3600)
 def htu_verilerini_getir():
@@ -92,7 +96,7 @@ def download_and_process_djvu(url, filename):
 
 
 # ========================================================
-# 2. DERGİPARK (CURL_CFFI MOTORU)
+# 2. DERGİPARK (ZENROWS İLE KESİN ÇÖZÜM)
 # ========================================================
 
 def search_dergipark_brave(keyword, count=15):
@@ -123,40 +127,63 @@ def search_dergipark_brave(keyword, count=15):
     except Exception as e: st.error(f"Arama Hatası: {e}")
     return []
 
-def get_real_pdf_url_cffi(article_url):
+def fetch_pdf_with_zenrows(article_url):
     """
-    curl_cffi kullanarak Bot Korumasını (Cloudflare) deler.
-    Gerçek Chrome tarayıcısı gibi davranır (TLS Impersonation).
+    ZenRows API kullanarak DergiPark korumasını deler ve PDF'i indirir.
     """
+    status_box = st.empty()
+    status_box.info("🚀 ZenRows API ile bağlanılıyor...")
+    
+    client = ZenRowsClient(ZENROWS_KEY)
+    
     try:
-        # Chrome 120 tarayıcısını taklit et
-        response = cffi_requests.get(
-            article_url, 
-            impersonate="chrome120", 
-            timeout=20
-        )
+        # 1. ADIM: Makale sayfasına git ve PDF linkini bul
+        # 'js_render=true' ve 'antibot=true' parametreleri korumayı aşar
+        params = {"js_render": "true", "antibot": "true"}
         
-        # Eğer hala verification sayfasına düşersek
-        if "verification" in response.url or "security" in response.text.lower():
-            return "BLOCKED"
+        response = client.get(article_url, params=params)
+        
+        if response.status_code != 200:
+            status_box.error(f"Sayfa açılamadı. Kod: {response.status_code}")
+            return None
 
-        soup = BeautifulSoup(response.content, 'lxml')
+        soup = BeautifulSoup(response.text, 'lxml')
         
-        # 1. Meta Etiketi (En Temiz Yol)
+        # Meta etiketinden PDF linkini al
+        pdf_link = None
         meta_tag = soup.find("meta", {"name": "citation_pdf_url"})
-        if meta_tag:
-            return fix_url(meta_tag.get("content"))
         
-        # 2. Buton Taraması
-        all_links = soup.find_all('a', href=True)
-        for link in all_links:
-            if 'download/article-file' in link['href']:
-                return fix_url(link['href'])
-                
+        if meta_tag:
+            pdf_link = meta_tag.get("content")
+        else:
+            # Bulamazsa butonları tara
+            all_links = soup.find_all('a', href=True)
+            for link in all_links:
+                if 'download/article-file' in link['href']:
+                    pdf_link = link['href']
+                    break
+        
+        if not pdf_link:
+            status_box.error("❌ PDF linki bulunamadı.")
+            return None
+            
+        final_pdf_url = fix_url(pdf_link)
+        status_box.info(f"✅ Link bulundu! İndiriliyor...")
+
+        # 2. ADIM: PDF'i ZenRows üzerinden indir (Yine korumayı aşarak)
+        # Binary veri olduğu için .content alacağız
+        pdf_response = client.get(final_pdf_url, params=params)
+        
+        if pdf_response.status_code == 200:
+            status_box.empty()
+            return pdf_response.content
+        else:
+            status_box.error(f"İndirme başarısız: {pdf_response.status_code}")
+            return None
+
     except Exception as e:
-        print(f"Hata: {e}")
+        status_box.error(f"ZenRows Hatası: {e}")
         return None
-    return None
 
 # ========================================================
 # ARAYÜZ
@@ -212,7 +239,7 @@ with tab1:
                     progress_bar.progress((idx + 1) / len(selected_rows))
             st.download_button("💾 ZIP Kaydet", zip_buffer.getvalue(), "HTU_Arsiv.zip", "application/zip")
 
-# --- SEKME 2: DERGİPARK (CURL_CFFI) ---
+# --- SEKME 2: DERGİPARK (ZENROWS) ---
 with tab2:
     st.header("🤖 DergiPark Makale Avcısı")
     with st.form("dp_form"):
@@ -222,6 +249,9 @@ with tab2:
 
     if 'dp_results' not in st.session_state:
         st.session_state.dp_results = []
+    
+    if 'dergipark_cache' not in st.session_state:
+        st.session_state.dergipark_cache = {}
 
     if dp_btn and dp_kelime:
         with st.spinner("🦁 Brave arşivleri tarıyor..."):
@@ -235,25 +265,20 @@ with tab2:
                 st.write(f"_{makale['desc']}_")
                 
                 col_a, col_b = st.columns([1, 3])
+                unique_key = f"dp_{i}"
                 
                 with col_a:
-                    # Kullanıcı "PDF Bul" dediğinde curl_cffi devreye girer
-                    if st.button("🔍 PDF Linkini Bul", key=f"find_{i}"):
-                        with st.spinner("Güvenlik duvarı aşılıyor..."):
-                            real_pdf_url = get_real_pdf_url_cffi(makale['link'])
-                            
-                            if real_pdf_url == "BLOCKED":
-                                st.error("❌ Sunucu çok yoğun korumalı. Lütfen yandaki linkten elle indirin.")
-                            elif real_pdf_url:
-                                st.success("Bulundu!")
-                                # Kullanıcı bu linke basınca KENDİ tarayıcısı indirecek
-                                # Böylece hiçbir engel olmaz.
-                                st.link_button("📥 PDF'İ İNDİR (Yeni Sekme)", real_pdf_url, type="primary")
-                            else:
-                                st.warning("Bu makalede açık PDF erişimi olmayabilir.")
-                                st.markdown(f"[Makaleye Git]({makale['link']})")
+                    if unique_key not in st.session_state.dergipark_cache:
+                        if st.button("📥 PDF Hazırla (ZenRows)", key=f"btn_{unique_key}"):
+                            pdf_data = fetch_pdf_with_zenrows(makale['link'])
+                            if pdf_data:
+                                st.session_state.dergipark_cache[unique_key] = pdf_data
+                                st.rerun()
+                    else:
+                        clean_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:30] + ".pdf"
+                        st.download_button("💾 PDF İNDİR", st.session_state.dergipark_cache[unique_key], clean_name, "application/pdf", key=f"dl_{unique_key}", type="primary")
 
                 with col_b:
-                    st.markdown(f"👉 **[Makale Sayfasına Git]({makale['link']})**")
+                    st.markdown(f"👉 **[Siteye Git]({makale['link']})**")
     elif dp_btn:
         st.warning("Sonuç bulunamadı.")
