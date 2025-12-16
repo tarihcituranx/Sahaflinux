@@ -12,85 +12,45 @@ import urllib3
 # SSL Uyarılarını Sustur
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SELENIUM KÜTÜPHANELERİ ---
+# --- SELENIUM ---
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
     from webdriver_manager.chrome import ChromeDriverManager
     from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
 except ImportError:
-    st.error("⚠️ Selenium kütüphanesi eksik! Lütfen terminale 'pip install selenium webdriver-manager' yazın.")
+    st.error("⚠️ Selenium kütüphanesi eksik!")
     st.stop()
 
-# --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide")
+st.set_page_config(page_title="Harici Kaynaklar (Debug Modu)", page_icon="🐞", layout="wide")
 
-# --- SESSION STATE (HAFIZA) ---
+# --- SESSION STATE ---
 if 'dergipark_cache' not in st.session_state:
     st.session_state.dergipark_cache = {}
 if 'dp_results' not in st.session_state:
     st.session_state.dp_results = []
 
-# --- YAN MENÜ ---
 with st.sidebar:
-    st.title("⚙️ Kontrol Paneli")
-    # st.page_link("app.py", label="⬅️ Ana Sayfaya Dön", icon="↩️") # Gerekirse açarsın
-    st.info("Bu modül Selenium kullanarak 'Gerçek Kullanıcı' taklidi yapar.")
-    st.markdown("---")
+    st.title("🐞 Debug Modu")
+    st.info("Bu mod, arka planda neler döndüğünü ekrana yazar.")
 
-st.title("🌍 Harici Kaynaklar & Canlı Arama")
+# --- YARDIMCI: URL TEMİZLEYİCİ ---
+def fix_url(link):
+    """Linkleri standart hale getirir."""
+    if not link.startswith("http"):
+        # Başında www veya dergipark varsa https ekle
+        if link.startswith("dergipark") or link.startswith("www"):
+            link = "https://" + link
+        # Hiçbiri yoksa ve / ile başlıyorsa domain ekle
+        elif link.startswith("/"):
+            link = "https://dergipark.org.tr" + link
+    return link
 
-# ==========================================
-# 1. HTU ARŞİVİ FONKSİYONLARI (Standart)
-# ==========================================
-@st.cache_data(ttl=3600)
-def htu_verilerini_getir():
-    base_url = "https://www.tufs.ac.jp/common/fs/asw/tur/htu/"
-    pages = ["list1.html", "list2.html"]
-    headers = {'User-Agent': 'Mozilla/5.0'}
-    all_data = []
-    
-    for page in pages:
-        full_url = base_url + page
-        try:
-            r = requests.get(full_url, headers=headers, timeout=30, verify=False)
-            r.encoding = 'utf-8'
-            if r.status_code == 200:
-                soup = BeautifulSoup(r.text, 'html.parser')
-                table = soup.find('table', id='tblist')
-                if table:
-                    for row in table.find_all('tr'):
-                        cols = row.find_all('td')
-                        if len(cols) >= 4:
-                            htu_no = cols[1].get_text(strip=True)
-                            if "HTU NO." in htu_no or not htu_no: continue
-                            
-                            link_tag = cols[2].find('a')
-                            raw_link = link_tag['href'] if link_tag and link_tag.has_attr('href') else ""
-                            full_link = base_url + raw_link if raw_link and not raw_link.startswith("http") else raw_link
-                            
-                            all_data.append({
-                                "HTU NO.": htu_no, 
-                                "BAŞLIK": cols[2].get_text(strip=True),
-                                "AÇIKLAMA": cols[3].get_text(strip=True), 
-                                "LINK": full_link
-                            })
-        except Exception as e: st.error(f"HTU Hatası: {e}")
-    return pd.DataFrame(all_data)
-
-def download_and_process_djvu(url, filename):
-    try:
-        r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, stream=True, verify=False)
-        return (r.content, "OK") if r.status_code == 200 else (None, "Bulunamadı")
-    except Exception as e: return None, str(e)
-
-# ==========================================
-# 2. DERGİPARK FONKSİYONLARI (SELENIUM GÜÇLENDİRMELİ)
-# ==========================================
-
+# --- BRAVE ARAMA ---
 def search_dergipark_brave(keyword, count=15):
-    """Brave API ile arama yapar."""
     try: api_key = st.secrets["BRAVE_API_KEY"]
     except: st.error("⚠️ API Anahtarı eksik!"); return []
 
@@ -106,177 +66,152 @@ def search_dergipark_brave(keyword, count=15):
             results = []
             if "web" in data and "results" in data["web"]:
                 for item in data["web"]["results"]:
-                    link = item["url"]
-                    if "/pub/article/" in link: continue # Hatalı linkleri ele
-                    results.append({
-                        "title": item["title"],
-                        "link": link,
-                        "desc": item.get("description", "")
-                    })
+                    raw_link = item["url"]
+                    
+                    # LINK TEMİZLEME
+                    clean_link = fix_url(raw_link)
+                    
+                    # Sadece makale linklerini al (/article/ geçenleri)
+                    if "dergipark.org.tr" in clean_link:
+                        results.append({
+                            "title": item["title"],
+                            "link": clean_link,
+                            "desc": item.get("description", "")
+                        })
             return results
     except Exception as e: st.error(f"Arama Hatası: {e}")
     return []
 
+# --- KRİTİK FONKSİYON: İNDİRME ---
 def fetch_pdf_content(article_url):
     """
-    SELENIUM İLE İNDİRME:
-    Gerçek bir Chrome tarayıcısı açar, siteye girer, butonu bulur,
-    çerezleri (cookies) alır ve dosyayı indirir. %100 Çözüm.
+    Hata ayıklama mesajları ile indirme işlemi.
     """
+    status_box = st.empty() # Durum mesajlarını göstermek için kutu
     
-    # Tarayıcı Ayarları (Gizli Mod)
+    # 1. Linki Kontrol Et
+    status_box.info(f"🔗 Bağlanılan Link: {article_url}")
+    
+    # Tarayıcı Ayarları
     chrome_options = Options()
-    chrome_options.add_argument("--headless") # Arka planda çalış (Pencere açma)
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
     driver = None
     try:
-        # Tarayıcıyı Başlat
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
-        # 1. Sayfaya Git
+        # 2. Sayfaya Git
         driver.get(article_url)
-        time.sleep(2) # Sayfanın yüklenmesini bekle
         
-        # 2. İndirme Linkini Bul (CSS Selector ile)
-        # href içinde 'download/article-file' geçen linki arıyoruz
-        download_element = driver.find_element(By.CSS_SELECTOR, "a[href*='download/article-file']")
+        # Yönlendirme oldu mu kontrol et
+        current_url = driver.current_url
+        if current_url != article_url:
+            status_box.info(f"🔀 Yönlendirme Yapıldı: {current_url}")
         
-        if download_element:
-            pdf_url = download_element.get_attribute("href")
+        # Sayfa Başlığı Kontrolü (404 var mı?)
+        page_title = driver.title
+        if "404" in page_title or "Bulunamadı" in page_title:
+            status_box.error(f"❌ HATA: Gidilen sayfa 404 veriyor! Link bozuk.")
+            return None
+
+        # 3. İndirme Linkini Bekle ve Bul
+        status_box.info("🔍 Sayfa taraniyor, PDF butonu aranıyor...")
+        
+        try:
+            # Butonun yüklenmesi için 5 saniye bekle
+            # href içinde 'article-file' geçen linki arıyoruz
+            download_element = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "a[href*='download/article-file']"))
+            )
             
-            # --- COOKIE TRANSFERİ (SİHİRLİ KISIM) ---
-            # Selenium'un aldığı güvenli çerezleri Requests'e aktarıyoruz
+            pdf_path = download_element.get_attribute("href")
+            
+            # Linki Tamamla
+            pdf_link = fix_url(pdf_path)
+            
+            status_box.success(f"✅ PDF Linki Bulundu: {pdf_link}")
+            
+            # --- İNDİRME İŞLEMİ (Cookie Transferi ile) ---
             selenium_cookies = driver.get_cookies()
             session = requests.Session()
             for cookie in selenium_cookies:
                 session.cookies.set(cookie['name'], cookie['value'])
             
-            # Header ayarla
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Referer": article_url
+                "Referer": current_url # Referans olarak geldiğimiz sayfayı göster
             }
             
-            # 3. İndir
-            response = session.get(pdf_url, headers=headers, stream=True)
+            response = session.get(pdf_link, headers=headers, stream=True)
             
             if response.status_code == 200:
+                # Dosya boyutunu kontrol et (çok küçükse hata sayfasıdır)
+                if len(response.content) < 2000:
+                    status_box.warning("⚠️ İndirilen dosya çok küçük (Hata sayfası olabilir).")
+                    return None
+                
+                status_box.empty() # Mesajları temizle
                 return response.content
             else:
-                st.error(f"Link bulundu ama sunucu hata verdi. Kod: {response.status_code}")
+                status_box.error(f"❌ İndirme Hatası. Sunucu Kodu: {response.status_code}")
                 return None
-        else:
-            st.warning("Bu sayfada PDF indirme butonu bulunamadı.")
+
+        except Exception as e:
+            status_box.warning("⚠️ Bu sayfada 'article-file' içeren bir indirme butonu bulunamadı.")
+            # Sayfa kaynağının bir kısmını göster (Debug için)
+            # st.code(driver.page_source[:500], language='html')
             return None
 
     except Exception as e:
-        # Hata detayını görmek için yorumu açabilirsin
-        # st.error(f"Selenium Hatası: {e}")
-        st.error("Bağlantı kurulamadı. DergiPark yoğun olabilir.")
+        status_box.error(f"Sistem Hatası: {e}")
         return None
     finally:
         if driver:
-            driver.quit() # Tarayıcıyı kapat
+            driver.quit()
 
-# ==========================================
-# ARAYÜZ SEKMELERİ
-# ==========================================
-tab1, tab2 = st.tabs(["📜 HTU Arşivi", "🤖 DergiPark Botu"])
+# --- ARAYÜZ ---
+st.header("🤖 DergiPark Botu (Debug Modu)")
 
-# --- SEKME 1: HTU ---
-with tab1:
-    st.header("📜 HTU Dijital Süreli Yayınlar")
+with st.form("dp_form"):
     col1, col2 = st.columns([4,1])
-    search_term = col1.text_input("HTU Yayını Ara:", placeholder="Örn: Tanin...")
+    dp_kelime = col1.text_input("Makale Ara:", placeholder="Örn: Milli Mücadele...")
+    dp_btn = col2.form_submit_button("🚀 Ara")
+
+if dp_btn and dp_kelime:
+    st.session_state.dergipark_cache = {} 
+    with st.spinner("🦁 Arşiv taranıyor..."):
+        st.session_state.dp_results = search_dergipark_brave(dp_kelime)
+
+if 'dp_results' in st.session_state and st.session_state.dp_results:
+    st.success(f"✅ {len(st.session_state.dp_results)} makale bulundu.")
     
-    with st.spinner("Tokyo Üniversitesi veritabanı taranıyor..."):
-        df = htu_verilerini_getir()
-    
-    if not df.empty:
-        if search_term:
-            df = df[df['BAŞLIK'].str.contains(search_term, case=False) | df['HTU NO.'].str.contains(search_term, case=False)]
-        
-        st.write(f"{len(df)} kayıt.")
-        df.insert(0, "Seç", False)
-        
-        edited_df = st.data_editor(
-            df,
-            column_config={
-                "Seç": st.column_config.CheckboxColumn("İndir", default=False),
-                "LINK": st.column_config.LinkColumn("Görüntüle")
-            },
-            hide_index=True, use_container_width=True, key="htu_editor"
-        )
-        
-        selected_rows = edited_df[edited_df["Seç"] == True]
-        if not selected_rows.empty and st.button("📦 Seçilenleri İndir (ZIP)", type="primary"):
-            progress_bar = st.progress(0)
-            zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zf:
-                for idx, row in enumerate(selected_rows.itertuples()):
-                    safe_title = re.sub(r'[\\/*?:"<>|]', "", row.BAŞLIK)[:40]
-                    if row.LINK.endswith(".djvu"):
-                        c, m = download_and_process_djvu(row.LINK, safe_title)
-                        if c: zf.writestr(f"{safe_title}.djvu", c)
-                    else:
-                        zf.writestr(f"{safe_title}_LINK.txt", f"Link: {row.LINK}")
-                    progress_bar.progress((idx + 1) / len(selected_rows))
-            st.download_button("💾 ZIP Kaydet", zip_buffer.getvalue(), "HTU_Arsiv.zip", "application/zip")
-
-# --- SEKME 2: DERGİPARK ---
-with tab2:
-    st.header("🤖 DergiPark Makale Avcısı")
-    st.info("Brave ile arama yapar, Selenium ile bot korumasını aşıp indirir.")
-
-    with st.form("dp_form"):
-        col1, col2 = st.columns([4,1])
-        dp_kelime = col1.text_input("Makale Ara:", placeholder="Örn: Milli Mücadele...")
-        dp_btn = col2.form_submit_button("🚀 Ara")
-
-    # ARAMA İŞLEMİ
-    if dp_btn and dp_kelime:
-        st.session_state.dergipark_cache = {} 
-        with st.spinner("🦁 Brave arşivleri tarıyor..."):
-            st.session_state.dp_results = search_dergipark_brave(dp_kelime)
-
-    # SONUÇLARI GÖSTER
-    if 'dp_results' in st.session_state and st.session_state.dp_results:
-        st.success(f"✅ {len(st.session_state.dp_results)} makale bulundu.")
-        
-        for i, makale in enumerate(st.session_state.dp_results):
-            with st.expander(f"📄 {makale['title']}"):
-                st.write(f"_{makale['desc']}_")
-                
-                col_a, col_b = st.columns([1, 3])
-                unique_key = f"dp_{i}"
-                
-                with col_a:
-                    if unique_key not in st.session_state.dergipark_cache:
-                        if st.button("📥 PDF Hazırla", key=f"btn_{unique_key}"):
-                            with st.spinner("Selenium ile siteye giriliyor ve indiriliyor..."):
-                                pdf_data = fetch_pdf_content(makale['link'])
-                                
-                                if pdf_data:
-                                    st.session_state.dergipark_cache[unique_key] = pdf_data
-                                    st.rerun()
-                                else:
-                                    st.error("İndirilemedi.")
-                    else:
-                        clean_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:30] + ".pdf"
-                        st.download_button(
-                            label="💾 PDF İNDİR",
-                            data=st.session_state.dergipark_cache[unique_key],
-                            file_name=clean_name,
-                            mime="application/pdf",
-                            key=f"dl_{unique_key}",
-                            type="primary"
-                        )
-                
-                with col_b:
-                    st.markdown(f"👉 **[Siteye Git]({makale['link']})**")
-    elif dp_btn:
-        st.warning("Sonuç bulunamadı.")
+    for i, makale in enumerate(st.session_state.dp_results):
+        with st.expander(f"📄 {makale['title']}"):
+            st.write(f"_{makale['desc']}_")
+            st.caption(f"🔗 Link: {makale['link']}") # Linki kullanıcıya gösterelim
+            
+            col_a, col_b = st.columns([1, 3])
+            unique_key = f"dp_{i}"
+            
+            with col_a:
+                if unique_key not in st.session_state.dergipark_cache:
+                    if st.button("📥 PDF Hazırla", key=f"btn_{unique_key}"):
+                        pdf_data = fetch_pdf_content(makale['link'])
+                        if pdf_data:
+                            st.session_state.dergipark_cache[unique_key] = pdf_data
+                            st.rerun()
+                else:
+                    clean_name = re.sub(r'[\\/*?:"<>|]', "", makale['title'])[:30] + ".pdf"
+                    st.download_button(
+                        "💾 PDF İNDİR", 
+                        st.session_state.dergipark_cache[unique_key], 
+                        clean_name, "application/pdf", 
+                        key=f"dl_{unique_key}", type="primary"
+                    )
+            
+            with col_b:
+                st.markdown(f"👉 **[Siteye Git]({makale['link']})**")
