@@ -18,7 +18,44 @@ except:
     st.error("⚠️ API Anahtarı bulunamadı! Lütfen .streamlit/secrets.toml dosyasını oluşturun.")
     st.stop()
 
-# --- FONKSİYONLAR ---
+# --- TEMİZLİK FONKSİYONU (YENİ EKLENDİ) ---
+def clean_ocr_text(text):
+    """
+    OCR metinlerindeki bozuklukları Python ile temizler.
+    Yapay zeka kullanmaz, kural tabanlı çalışır.
+    """
+    if not text:
+        return ""
+
+    # 1. Tire (-) ile bölünmüş kelimeleri birleştir (Örn: "da- vası" -> "davası")
+    # Hem satır sonu (-) hem de kelime ortası yanlış boşluklu tireleri yakalar.
+    text = re.sub(r'-\s+', '', text)
+
+    # 2. Fazla boşlukları, tab'ları ve yeni satırları tek bir boşluğa indir
+    text = re.sub(r'\s+', ' ', text)
+
+    # 3. Yaygın OCR hatalarını düzelt (Dictionary Yöntemi)
+    # Eski taramalarda harfler bazen ayrı ayrı çıkar.
+    replacements = {
+        " v e ": " ve ",
+        " b ir ": " bir ",
+        " b u ": " bu ",
+        " d e ": " de ",
+        " d a ": " da ",
+        " n e ": " ne ",
+        " i ç i n ": " için ",
+        " o l a n ": " olan ",
+        " ı ": "ı", 
+        " i ": "i",
+    }
+    
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    # 4. Metnin başındaki ve sonundaki boşlukları temizle
+    return text.strip()
+
+# --- DİĞER FONKSİYONLAR ---
 
 def search_brave(keyword, count=20):
     """Brave Search API kullanarak arama yapar"""
@@ -50,7 +87,11 @@ def search_brave(keyword, count=20):
                 
                 for r in results:
                     page_url = r["url"]
-                    desc = r.get("description", "")
+                    # Açıklamayı alıyoruz (Bazen description boş olabilir)
+                    raw_desc = r.get("description", "") or r.get("title", "")
+                    
+                    # --- OTOMATİK TEMİZLİK BURADA YAPILIYOR ---
+                    final_desc = clean_ocr_text(raw_desc)
                     
                     match = re.search(r"gazete\/([^\/]+)\/(\d{4}-\d{2}-\d{2})\/(\d+)", page_url)
                     
@@ -65,7 +106,7 @@ def search_brave(keyword, count=20):
                             "name": g_name,
                             "date": date_str,
                             "page": page_num,
-                            "desc": desc,
+                            "desc": final_desc, # Artık temizlenmiş metni kaydediyoruz
                             "url": page_url
                         })
         elif response.status_code == 429:
@@ -99,19 +140,15 @@ def download_pdf(gid, date_str, page_num):
             img = Image.open(BytesIO(r.content)).convert("L")
             pdf_buffer = BytesIO()
             img.save(pdf_buffer, format="PDF", resolution=100.0, quality=85)
-            # Buffer'ın başına dönüyoruz ki okuma yapılabilsin
             pdf_buffer.seek(0)
             return pdf_buffer
     except:
         return None
     return None
 
-# --- SESSION STATE (HAFIZA) AYARLARI ---
-# Arama sonuçlarını hafızada tutuyoruz
+# --- SESSION STATE ---
 if 'search_results' not in st.session_state:
     st.session_state.search_results = []
-
-# Hazırlanan PDF'leri hafızada tutuyoruz
 if 'pdf_cache' not in st.session_state:
     st.session_state.pdf_cache = {}
 
@@ -124,19 +161,18 @@ with st.sidebar:
     st.header("Arama Ayarları")
     keyword = st.text_input("Anahtar Kelime", placeholder="Örn: 10 Kasım, Hatay...")
     count_slider = st.slider("Sonuç Sayısı", 10, 50, 20)
-    # Arama butonuna basınca sonuçları session_state'e kaydediyoruz
+    
     if st.button("ARA 🔎", type="primary"):
         if keyword:
-            with st.spinner("Brave arşivi tarıyor..."):
+            with st.spinner("Brave arşivi tarıyor ve metinleri temizliyor..."):
                 st.session_state.search_results = search_brave(keyword, count_slider)
-                # Yeni arama yapıldığında eski PDF önbelleğini temizle (isteğe bağlı)
                 st.session_state.pdf_cache = {} 
         else:
             st.warning("Lütfen bir kelime girin.")
     
     st.info("Brave API, ayda 2000 aramaya kadar ücretsizdir.")
 
-# Sonuçları session_state'den okuyoruz (Sayfa yenilense de kaybolmaz)
+# SONUÇLARI GÖSTER
 results = st.session_state.search_results
 
 if results:
@@ -157,27 +193,24 @@ if results:
             with c2:
                 st.subheader(f"{item['name']} - {item['date']}")
                 st.caption(f"Sayfa: {item['page']}")
+                
+                # TEMİZLENMİŞ METİN BURADA GÖSTERİLİYOR
                 st.write(f"_{item['desc']}_")
                 
                 col_dl, col_go = st.columns([1, 3])
                 
-                # Benzersiz anahtar (ID_Tarih_Sayfa)
                 unique_id = f"{item['id']}_{item['date']}_{item['page']}"
                 
                 with col_dl:
-                    # EĞER PDF HAFIZADA YOKSA "HAZIRLA" BUTONU GÖSTER
                     if unique_id not in st.session_state.pdf_cache:
                         if st.button(f"📥 PDF Hazırla", key=f"btn_{unique_id}"):
                             with st.spinner("PDF Dönüştürülüyor..."):
                                 pdf_data = download_pdf(item['id'], item['date'], item['page'])
                                 if pdf_data:
-                                    # Veriyi hafızaya kaydet ve sayfayı yenile
                                     st.session_state.pdf_cache[unique_id] = pdf_data
                                     st.rerun()
                                 else:
                                     st.error("Dosya alınamadı.")
-                    
-                    # EĞER PDF HAFIZADA VARSA "İNDİR" BUTONU GÖSTER
                     else:
                         fname = f"{item['name']}_{item['date']}_S{item['page']}.pdf"
                         st.download_button(
