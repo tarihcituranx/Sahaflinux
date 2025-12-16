@@ -18,57 +18,67 @@ except:
     st.error("⚠️ API Anahtarı bulunamadı! Lütfen .streamlit/secrets.toml dosyasını oluşturun.")
     st.stop()
 
-# --- METİN TEMİZLEME FONKSİYONU ---
+# --- METİN TEMİZLEME FONKSİYONU (GÜNCELLENDİ) ---
 def clean_ocr_text(text):
-    if not text: return ""
+    """OCR metinlerindeki HTML etiketlerini ve bozuklukları temizler."""
+    if not text:
+        return ""
+    
+    # 1. HTML Etiketlerini Sil (<strong>, </b> vb.)
+    text = re.sub(r'<[^>]+>', '', text)
+
+    # 2. Gereksiz Sembolleri Sil (| işareti vb.)
+    text = text.replace("|", "")
+
+    # 3. Tire ile bölünmüş kelimeleri birleştir (da- vası -> davası)
     text = re.sub(r'-\s+', '', text)
+
+    # 4. Fazla boşlukları temizle
     text = re.sub(r'\s+', ' ', text)
+
+    # 5. Yaygın OCR hataları
     replacements = {
         " v e ": " ve ", " b ir ": " bir ", " b u ": " bu ", 
         " d e ": " de ", " d a ": " da ", " n e ": " ne ",
         " i ç i n ": " için ", " o l a n ": " olan ", " ı ": "ı", " i ": "i",
+        " & ": " ", # & işareti genelde bozuk çıkıyor
     }
     for old, new in replacements.items():
         text = text.replace(old, new)
+
     return text.strip()
 
-# --- KRİTİK GÜNCELLEME: DOSYA İSMİ VARYASYONLARI ---
+# --- DOSYA İSMİ VARYASYONLARI (AKILLI DENEME) ---
 def generate_variations(date_str, page_num, suffix):
     """
     Sunucudaki olası dosya isimlerini üretir.
-    Örn: URL'de sayfa 1 ise, dosya 0.jpg olabilir.
+    Hem 1 hem 0 tabanlı sayfa numaralarını dener.
     """
     variations = []
     try:
         y, m, d = date_str.split("-")
         p_num = int(page_num)
         
-        # --- EN ÖNEMLİ EKLEMELER BURADA ---
-        
-        # 1. İhtimal: Sayfa numarasının 1 eksiği (0 tabanlı indeksleme)
-        # Senin örneğindeki gibi URL'de 1 yazıp dosyada 0 yazıyorsa bunu yakalar.
+        # 1. İhtimal: Sayfa numarasının 1 eksiği (0 tabanlı indeksleme - Örn: 1957-09-10-0.jpg)
         if p_num > 0:
-            variations.append(f"{date_str}-{p_num - 1}{suffix}")          # 1957-09-10-0.jpg
-            variations.append(f"{date_str}-{p_num - 1:02d}{suffix}")      # 1957-09-10-00.jpg
+            variations.append(f"{date_str}-{p_num - 1}{suffix}")
+            variations.append(f"{date_str}-{p_num - 1:02d}{suffix}")
 
-        # 2. İhtimal: Standart (Aynısı)
-        variations.append(f"{date_str}-{p_num}{suffix}")                  # 1957-09-10-1.jpg
+        # 2. İhtimal: Standart
+        variations.append(f"{date_str}-{p_num}{suffix}")
         
-        # 3. İhtimal: Sıfır dolgulu (01)
-        variations.append(f"{date_str}-{p_num:02d}{suffix}")              # 1957-09-10-01.jpg
+        # 3. İhtimal: Sıfır dolgulu
+        variations.append(f"{date_str}-{p_num:02d}{suffix}")
         
-        # 4. İhtimal: Sıfırsız Tarih (1957-9-10)
-        variations.append(f"{y}-{int(m)}-{int(d)}-{p_num}{suffix}")       # 1957-9-10-1.jpg
+        # 4. İhtimal: Sıfırsız Tarih
+        variations.append(f"{y}-{int(m)}-{int(d)}-{p_num}{suffix}")
         
         # 5. İhtimal: Sıfırsız Tarih + 1 Eksiği
         if p_num > 0:
-            variations.append(f"{y}-{int(m)}-{int(d)}-{p_num - 1}{suffix}") # 1957-9-10-0.jpg
+            variations.append(f"{y}-{int(m)}-{int(d)}-{p_num - 1}{suffix}")
 
     except:
         pass
-    
-    # Debug için (Hangi linkleri denediğini görmek istersen açabilirsin)
-    # st.write(variations) 
     return variations
 
 # --- GÖRÜNTÜ VE PDF İŞLEMLERİ ---
@@ -139,7 +149,9 @@ def search_brave(keyword, count=20):
                 results = data["web"]["results"]
                 for r in results:
                     page_url = r["url"]
+                    # Açıklama veya başlık alınıyor
                     raw_desc = r.get("description", "") or r.get("title", "")
+                    # HTML temizliği burada yapılıyor
                     final_desc = clean_ocr_text(raw_desc)
                     
                     match = re.search(r"gazete\/([^\/]+)\/(\d{4}-\d{2}-\d{2})\/(\d+)", page_url)
