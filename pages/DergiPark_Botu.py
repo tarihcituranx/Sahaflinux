@@ -5,8 +5,14 @@ from io import BytesIO
 import zipfile
 from bs4 import BeautifulSoup
 import urllib3
-import cloudscraper
 import re
+
+# YENİ KÜTÜPHANE: Bot Koruması Delici
+try:
+    from curl_cffi import requests as cffi_requests
+except ImportError:
+    st.error("⚠️ `curl_cffi` kütüphanesi eksik! Lütfen requirements.txt dosyasına 'curl_cffi' ekleyin.")
+    st.stop()
 
 # SSL Uyarılarını Sustur
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -16,10 +22,9 @@ st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide
 # --- YAN MENÜ ---
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
-    st.success("✅ HTU: Aktif")
-    st.info("✅ DergiPark: Doğrudan Link Modu")
+    st.success("✅ HTU: Agresif Mod")
+    st.info("✅ DergiPark: curl_cffi (TLS Impersonation)")
     st.markdown("---")
-    st.caption("Eğer 'Hazırla' butonu çalışmazsa, altta çıkan '🔗 Tarayıcıda Aç' butonunu kullanın.")
 
 # --- URL DÜZELTİCİ ---
 def fix_url(link):
@@ -32,7 +37,7 @@ def fix_url(link):
     return link
 
 # ========================================================
-# 1. HTU ARŞİVİ (ZATEN ÇALIŞAN KISIM)
+# 1. HTU ARŞİVİ (ZATEN ÇALIŞAN KISIM - DOKUNULMADI)
 # ========================================================
 @st.cache_data(ttl=3600)
 def htu_verilerini_getir():
@@ -87,7 +92,7 @@ def download_and_process_djvu(url, filename):
 
 
 # ========================================================
-# 2. DERGİPARK (DOĞRUDAN LİNK BULUCU)
+# 2. DERGİPARK (CURL_CFFI MOTORU)
 # ========================================================
 
 def search_dergipark_brave(keyword, count=15):
@@ -118,19 +123,29 @@ def search_dergipark_brave(keyword, count=15):
     except Exception as e: st.error(f"Arama Hatası: {e}")
     return []
 
-def get_real_pdf_url(article_url):
+def get_real_pdf_url_cffi(article_url):
     """
-    Sunucu tarafında indirmek yerine, sadece gerçek PDF linkini bulur.
+    curl_cffi kullanarak Bot Korumasını (Cloudflare) deler.
+    Gerçek Chrome tarayıcısı gibi davranır (TLS Impersonation).
     """
-    scraper = cloudscraper.create_scraper()
     try:
-        response = scraper.get(article_url, timeout=10)
-        soup = BeautifulSoup(response.text, 'lxml')
+        # Chrome 120 tarayıcısını taklit et
+        response = cffi_requests.get(
+            article_url, 
+            impersonate="chrome120", 
+            timeout=20
+        )
         
-        # 1. Meta Etiketi (En garantisi)
+        # Eğer hala verification sayfasına düşersek
+        if "verification" in response.url or "security" in response.text.lower():
+            return "BLOCKED"
+
+        soup = BeautifulSoup(response.content, 'lxml')
+        
+        # 1. Meta Etiketi (En Temiz Yol)
         meta_tag = soup.find("meta", {"name": "citation_pdf_url"})
         if meta_tag:
-            return meta_tag.get("content")
+            return fix_url(meta_tag.get("content"))
         
         # 2. Buton Taraması
         all_links = soup.find_all('a', href=True)
@@ -138,7 +153,8 @@ def get_real_pdf_url(article_url):
             if 'download/article-file' in link['href']:
                 return fix_url(link['href'])
                 
-    except:
+    except Exception as e:
+        print(f"Hata: {e}")
         return None
     return None
 
@@ -196,7 +212,7 @@ with tab1:
                     progress_bar.progress((idx + 1) / len(selected_rows))
             st.download_button("💾 ZIP Kaydet", zip_buffer.getvalue(), "HTU_Arsiv.zip", "application/zip")
 
-# --- SEKME 2: DERGİPARK (GARANTİ YÖNTEM) ---
+# --- SEKME 2: DERGİPARK (CURL_CFFI) ---
 with tab2:
     st.header("🤖 DergiPark Makale Avcısı")
     with st.form("dp_form"):
@@ -221,21 +237,21 @@ with tab2:
                 col_a, col_b = st.columns([1, 3])
                 
                 with col_a:
-                    # Burada sunucuyu yormuyoruz, direkt linki bulup veriyoruz
-                    # Kullanıcı tıklayınca kendi tarayıcısı indirecek (404/403 vermez)
-                    
-                    # Butona basınca arka planda gerçek PDF linkini bulmaya çalış
-                    if st.button("🔍 Linki Bul", key=f"find_{i}"):
-                        with st.spinner("PDF adresi çözümleniyor..."):
-                            real_pdf_url = get_real_pdf_url(makale['link'])
+                    # Kullanıcı "PDF Bul" dediğinde curl_cffi devreye girer
+                    if st.button("🔍 PDF Linkini Bul", key=f"find_{i}"):
+                        with st.spinner("Güvenlik duvarı aşılıyor..."):
+                            real_pdf_url = get_real_pdf_url_cffi(makale['link'])
                             
-                            if real_pdf_url:
+                            if real_pdf_url == "BLOCKED":
+                                st.error("❌ Sunucu çok yoğun korumalı. Lütfen yandaki linkten elle indirin.")
+                            elif real_pdf_url:
                                 st.success("Bulundu!")
-                                # Kırmızı, dikkat çekici, yeni sekmede açılan buton
-                                st.link_button("📥 PDF'İ AÇ / İNDİR", real_pdf_url, type="primary")
+                                # Kullanıcı bu linke basınca KENDİ tarayıcısı indirecek
+                                # Böylece hiçbir engel olmaz.
+                                st.link_button("📥 PDF'İ İNDİR (Yeni Sekme)", real_pdf_url, type="primary")
                             else:
-                                st.error("PDF linki gizli veya bulunamadı.")
-                                st.markdown(f"[Makale Sayfasına Git]({makale['link']})")
+                                st.warning("Bu makalede açık PDF erişimi olmayabilir.")
+                                st.markdown(f"[Makaleye Git]({makale['link']})")
 
                 with col_b:
                     st.markdown(f"👉 **[Makale Sayfasına Git]({makale['link']})**")
