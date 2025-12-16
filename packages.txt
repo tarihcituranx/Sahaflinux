@@ -2,6 +2,7 @@ chromium
 chromium-driver
 tesseract-ocr
 tesseract-ocr-tur
+libtesseract-dev
 poppler-utils
 djvulibre-bin
 libgl1-mesa-glx
