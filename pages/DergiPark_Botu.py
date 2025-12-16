@@ -7,27 +7,19 @@ from bs4 import BeautifulSoup
 import urllib3
 import re
 
-# ZENROWS KÜTÜPHANESİ
-try:
-    from zenrows import ZenRowsClient
-except ImportError:
-    st.error("⚠️ `zenrows` kütüphanesi eksik! requirements.txt dosyasına ekleyin.")
-    st.stop()
-
 # SSL Uyarılarını Sustur
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide")
 
-# --- API ANAHTARI ---
-# Normalde st.secrets içinden almalısın ama şimdilik senin verdiğini kullanıyoruz.
-ZENROWS_KEY = "6f09eed1a045e0384a2e8aa817a155f0ade82187"
+# --- API ANAHTARI (ZenRows) ---
+ZENROWS_API_KEY = "6f09eed1a045e0384a2e8aa817a155f0ade82187"
 
 # --- YAN MENÜ ---
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
     st.success("✅ HTU: Agresif Mod")
-    st.success("✅ DergiPark: ZenRows API (Premium)")
+    st.success("✅ DergiPark: ZenRows (Direct API)")
     st.markdown("---")
 
 # --- URL DÜZELTİCİ ---
@@ -96,7 +88,7 @@ def download_and_process_djvu(url, filename):
 
 
 # ========================================================
-# 2. DERGİPARK (ZENROWS İLE KESİN ÇÖZÜM)
+# 2. DERGİPARK (ZENROWS DIRECT API)
 # ========================================================
 
 def search_dergipark_brave(keyword, count=15):
@@ -127,36 +119,41 @@ def search_dergipark_brave(keyword, count=15):
     except Exception as e: st.error(f"Arama Hatası: {e}")
     return []
 
-def fetch_pdf_with_zenrows(article_url):
+def fetch_pdf_zenrows_direct(article_url):
     """
-    ZenRows API kullanarak DergiPark korumasını deler ve PDF'i indirir.
+    ZenRows API'sini requests ile doğrudan çağırarak PDF indirir.
+    Ekstra kütüphane gerektirmez.
     """
     status_box = st.empty()
-    status_box.info("🚀 ZenRows API ile bağlanılıyor...")
+    status_box.info("🚀 ZenRows API ile siteye giriliyor...")
     
-    client = ZenRowsClient(ZENROWS_KEY)
+    zenrows_url = "https://api.zenrows.com/v1/"
+    
+    # 1. ADIM: Makale Sayfasını Çek (HTML)
+    params_html = {
+        'url': article_url,
+        'apikey': ZENROWS_API_KEY,
+        'js_render': 'true',  # JavaScript çalıştır
+        'antibot': 'true',    # Cloudflare'i geç
+    }
     
     try:
-        # 1. ADIM: Makale sayfasına git ve PDF linkini bul
-        # 'js_render=true' ve 'antibot=true' parametreleri korumayı aşar
-        params = {"js_render": "true", "antibot": "true"}
-        
-        response = client.get(article_url, params=params)
+        response = requests.get(zenrows_url, params=params_html)
         
         if response.status_code != 200:
-            status_box.error(f"Sayfa açılamadı. Kod: {response.status_code}")
+            status_box.error(f"ZenRows Hatası (HTML): {response.text}")
             return None
-
+            
         soup = BeautifulSoup(response.text, 'lxml')
         
-        # Meta etiketinden PDF linkini al
+        # PDF Linkini Bul
         pdf_link = None
+        # Önce Meta tag
         meta_tag = soup.find("meta", {"name": "citation_pdf_url"})
-        
         if meta_tag:
             pdf_link = meta_tag.get("content")
         else:
-            # Bulamazsa butonları tara
+            # Sonra Butonlar
             all_links = soup.find_all('a', href=True)
             for link in all_links:
                 if 'download/article-file' in link['href']:
@@ -164,25 +161,31 @@ def fetch_pdf_with_zenrows(article_url):
                     break
         
         if not pdf_link:
-            status_box.error("❌ PDF linki bulunamadı.")
+            status_box.error("❌ PDF Linki Bulunamadı.")
             return None
             
         final_pdf_url = fix_url(pdf_link)
         status_box.info(f"✅ Link bulundu! İndiriliyor...")
-
-        # 2. ADIM: PDF'i ZenRows üzerinden indir (Yine korumayı aşarak)
-        # Binary veri olduğu için .content alacağız
-        pdf_response = client.get(final_pdf_url, params=params)
+        
+        # 2. ADIM: PDF'i İndir (Yine ZenRows üzerinden)
+        # Çünkü PDF linki de korumalı olabilir
+        params_pdf = {
+            'url': final_pdf_url,
+            'apikey': ZENROWS_API_KEY,
+            'antibot': 'true',
+        }
+        
+        pdf_response = requests.get(zenrows_url, params=params_pdf)
         
         if pdf_response.status_code == 200:
             status_box.empty()
             return pdf_response.content
         else:
-            status_box.error(f"İndirme başarısız: {pdf_response.status_code}")
+            status_box.error(f"ZenRows PDF İndirme Hatası: {pdf_response.status_code}")
             return None
 
     except Exception as e:
-        status_box.error(f"ZenRows Hatası: {e}")
+        status_box.error(f"Bağlantı Hatası: {e}")
         return None
 
 # ========================================================
@@ -239,7 +242,7 @@ with tab1:
                     progress_bar.progress((idx + 1) / len(selected_rows))
             st.download_button("💾 ZIP Kaydet", zip_buffer.getvalue(), "HTU_Arsiv.zip", "application/zip")
 
-# --- SEKME 2: DERGİPARK (ZENROWS) ---
+# --- SEKME 2: DERGİPARK ---
 with tab2:
     st.header("🤖 DergiPark Makale Avcısı")
     with st.form("dp_form"):
@@ -270,7 +273,7 @@ with tab2:
                 with col_a:
                     if unique_key not in st.session_state.dergipark_cache:
                         if st.button("📥 PDF Hazırla (ZenRows)", key=f"btn_{unique_key}"):
-                            pdf_data = fetch_pdf_with_zenrows(makale['link'])
+                            pdf_data = fetch_pdf_zenrows_direct(makale['link'])
                             if pdf_data:
                                 st.session_state.dergipark_cache[unique_key] = pdf_data
                                 st.rerun()
