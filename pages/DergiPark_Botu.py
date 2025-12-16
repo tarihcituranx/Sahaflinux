@@ -8,24 +8,12 @@ from io import BytesIO
 import zipfile
 from bs4 import BeautifulSoup
 import urllib3
+import cloudscraper # Bot korumasını aşmak için şart
 
 # SSL Uyarılarını Sustur
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- SELENIUM KÜTÜPHANELERİ ---
-try:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
-    from webdriver_manager.chrome import ChromeDriverManager
-    from webdriver_manager.core.os_manager import ChromeType
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-except ImportError:
-    st.error("⚠️ Gerekli kütüphaneler eksik! Lütfen requirements.txt dosyasını kontrol edin.")
-    st.stop()
-
+# --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide")
 
 # --- SESSION STATE ---
@@ -37,8 +25,8 @@ if 'dp_results' not in st.session_state:
 # --- YAN MENÜ ---
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
-    st.success("✅ Modüller Aktif")
-    st.info("HTU Modu: Agresif Tarama (Tüm Satırlar)")
+    st.success("✅ HTU: Agresif Tarama Aktif")
+    st.success("✅ DergiPark: Meta-Tag Yakalayıcı Aktif")
     st.markdown("---")
 
 # --- YARDIMCI: URL DÜZELTİCİ ---
@@ -52,14 +40,10 @@ def fix_url(link):
     return link
 
 # ========================================================
-# 1. HTU ARŞİVİ (AGRESİF TARAMA MODU)
+# 1. HTU ARŞİVİ (ÇALIŞAN SÜRÜM - DOKUNULMADI)
 # ========================================================
 @st.cache_data(ttl=3600)
 def htu_verilerini_getir():
-    """
-    Standart tablo okuma yerine, sayfadaki TÜM satırları (tr) tarar.
-    Bozuk HTML yapılarından etkilenmez. 2662 veriyi hedefler.
-    """
     base_url = "https://www.tufs.ac.jp/common/fs/asw/tur/htu/"
     pages = ["list1.html", "list2.html"] 
     headers = {'User-Agent': 'Mozilla/5.0'}
@@ -70,76 +54,42 @@ def htu_verilerini_getir():
     for page in pages:
         full_url = base_url + page
         try:
-            status_text.text(f"Veritabanı taranıyor: {page}...")
+            status_text.text(f"HTU Veritabanı taranıyor: {page}...")
             r = requests.get(full_url, headers=headers, timeout=30, verify=False)
             r.encoding = 'utf-8' 
             
             if r.status_code == 200:
-                # lxml parser kullanıyoruz (Bozuk HTML için en iyisi)
-                try:
-                    soup = BeautifulSoup(r.content, 'lxml')
-                except:
-                    soup = BeautifulSoup(r.content, 'html.parser')
+                try: soup = BeautifulSoup(r.content, 'lxml')
+                except: soup = BeautifulSoup(r.content, 'html.parser')
 
-                # Tablo ID'sine bakmaksızın sayfadaki TÜM satırları al
-                # Çünkü bazen tablo etiketi erken kapanıyor ama veriler devam ediyor
                 all_rows = soup.find_all('tr')
-                
                 for row in all_rows:
                     try:
                         cols = row.find_all(['td', 'th'])
-                        
-                        # En az 3 sütunu olan satırları dikkate al
                         if len(cols) >= 3:
                             col_texts = [c.get_text(strip=True) for c in cols]
-                            
-                            # İkinci sütunda "HTU NO" yazmayan ama dolu olanları al
-                            # Genelde yapı: [Sıra, HTU No, Başlık, Açıklama]
                             htu_no = col_texts[1]
-                            
-                            # Başlık satırını atla
-                            if "HTU NO" in htu_no or not htu_no:
-                                continue
-                            
-                            # Eğer HTU No çok uzunsa veya anlamsızsa (yanlış satırsa) atla
-                            if len(htu_no) > 20: 
-                                continue
+                            if "HTU NO" in htu_no or not htu_no: continue
+                            if len(htu_no) > 20: continue
 
-                            # Verileri al
                             baslik = col_texts[2] if len(cols) > 2 else ""
                             aciklama = col_texts[3] if len(cols) > 3 else ""
 
-                            # Linki al (Başlık sütununun içinde)
                             link_tag = cols[2].find('a')
                             raw_link = link_tag['href'] if link_tag and link_tag.has_attr('href') else ""
-                            
-                            # Linki düzelt
-                            if raw_link:
-                                if not raw_link.startswith("http"):
-                                    full_link = base_url + raw_link
-                                else:
-                                    full_link = raw_link
-                            else:
-                                full_link = ""
+                            full_link = base_url + raw_link if raw_link and not raw_link.startswith("http") else raw_link
                             
                             all_data.append({
-                                "HTU NO.": htu_no, 
-                                "BAŞLIK": baslik,
-                                "AÇIKLAMA": aciklama, 
-                                "LINK": full_link
+                                "HTU NO.": htu_no, "BAŞLIK": baslik,
+                                "AÇIKLAMA": aciklama, "LINK": full_link
                             })
-                    except:
-                        continue
-        except Exception as e:
-            st.error(f"Hata ({page}): {e}")
+                    except: continue
+        except Exception as e: st.error(f"HTU Hatası: {e}")
     
     status_text.empty()
-    
-    # Veri tekrarını önlemek için HTU NO'ya göre temizle (Opsiyonel)
+    # Tekrarları temizle
     df = pd.DataFrame(all_data)
-    if not df.empty:
-        df = df.drop_duplicates(subset=['HTU NO.'])
-        
+    if not df.empty: df = df.drop_duplicates(subset=['HTU NO.'])
     return df
 
 def download_and_process_djvu(url, filename):
@@ -150,7 +100,7 @@ def download_and_process_djvu(url, filename):
 
 
 # ========================================================
-# 2. DERGİPARK (SELENIUM - ÇALIŞAN VERSİYON)
+# 2. DERGİPARK (YENİ STRATEJİ: META TAG YÖNTEMİ)
 # ========================================================
 
 def search_dergipark_brave(keyword, count=15):
@@ -181,99 +131,83 @@ def search_dergipark_brave(keyword, count=15):
     except Exception as e: st.error(f"Arama Hatası: {e}")
     return []
 
-def fetch_pdf_content(article_url):
+def fetch_pdf_smart(article_url):
     """
-    Streamlit Cloud'da çalışan özel Selenium konfigürasyonu.
-    Sürüm hatalarını ve 404'ü engeller.
+    Selenium yerine Cloudscraper + Meta Tag okuma yöntemi.
+    Daha hızlı, hatasız ve bot korumasına takılmaz.
     """
     status_box = st.empty()
-    status_box.info(f"🚀 PDF Aranıyor...")
-    
-    # Tarayıcı Ayarları
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    status_box.info("🚀 Makale sayfasına bağlanılıyor...")
 
-    driver = None
+    # Cloudscraper oluştur (Bot korumasını geçmek için)
+    scraper = cloudscraper.create_scraper(
+        browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+    )
+
     try:
-        # --- TARAYICI SÜRÜCÜSÜ SEÇİMİ (EN SAĞLAM YÖNTEM) ---
-        service = None
+        # 1. Makale Sayfasını Çek
+        response = scraper.get(article_url, timeout=20)
         
-        # 1. Cloud Ortamı (Linux) - packages.txt ile kurulanlar
-        if os.path.exists("/usr/bin/chromium"):
-            chrome_options.binary_location = "/usr/bin/chromium"
-            service = Service("/usr/bin/chromedriver")
-        
-        # 2. Alternatif Linux Yolu
-        elif os.path.exists("/usr/bin/chromium-browser"):
-            chrome_options.binary_location = "/usr/bin/chromium-browser"
-            # Burada Webdriver Manager kullanıyoruz ama CHROMIUM tipiyle
-            service = Service(ChromeDriverManager(chrome_type=ChromeType.CHROMIUM).install())
-        
-        # 3. Local Ortam (Windows/Mac)
-        else:
-            service = Service(ChromeDriverManager().install())
-
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        # Sayfaya Git
-        driver.get(article_url)
-        
-        # 404 Kontrolü
-        if "404" in driver.title or "Bulunamadı" in driver.title:
-            status_box.error("❌ Link hatalı (404).")
+        if response.status_code != 200:
+            status_box.error(f"Sayfaya girilemedi (Kod: {response.status_code})")
             return None
 
-        # İndirme Butonunu Bekle ve Bul
-        try:
-            download_element = WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, "a[href*='download/article-file']"))
-            )
+        soup = BeautifulSoup(response.text, 'lxml')
+
+        # 2. YÖNTEM A: Meta Etiketinden PDF Linkini Al (En Temiz Yol)
+        # DergiPark, Google Scholar için <meta name="citation_pdf_url" content="..."> kullanır.
+        meta_pdf = soup.find("meta", {"name": "citation_pdf_url"})
+        
+        pdf_link = None
+        if meta_pdf and meta_pdf.get("content"):
+            pdf_link = meta_pdf["content"]
+            status_box.info("✅ PDF Meta Etiketi bulundu!")
+        
+        # 3. YÖNTEM B: Eğer Meta yoksa, butonun içini ara
+        if not pdf_link:
+            status_box.info("⚠️ Meta etiketi yok, buton aranıyor...")
+            # href içinde download/article-file geçen butonu bul
+            btn = soup.find('a', href=re.compile(r'download\/article-file\/\d+'))
+            if btn:
+                pdf_link = fix_url(btn['href'])
+                status_box.info("✅ İndirme butonu bulundu!")
+
+        # 4. İndirme İşlemi
+        if pdf_link:
+            # Linkin doğru formatta olduğundan emin ol
+            pdf_link = fix_url(pdf_link)
             
-            pdf_path = download_element.get_attribute("href")
-            pdf_link = fix_url(pdf_path)
+            status_box.info(f"📥 İndiriliyor: {pdf_link}")
             
-            # COOKIE TRANSFERİ
-            selenium_cookies = driver.get_cookies()
-            session = requests.Session()
-            for cookie in selenium_cookies:
-                session.cookies.set(cookie['name'], cookie['value'])
-            
+            # Referer Header ekle (404 hatasını çözer)
             headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Referer": driver.current_url
+                "Referer": article_url,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             }
             
-            status_box.info("📥 İndirme başladı...")
-            response = session.get(pdf_link, headers=headers, stream=True)
+            pdf_response = scraper.get(pdf_link, headers=headers, stream=True)
             
-            if response.status_code == 200:
-                if len(response.content) < 1500:
-                    status_box.warning("⚠️ Dosya çok küçük, erişim engeli olabilir.")
+            if pdf_response.status_code == 200:
+                # Boyut kontrolü
+                if len(pdf_response.content) < 2000:
+                    status_box.error("⚠️ İndirilen dosya hatalı (Boyut çok küçük).")
                     return None
                 
                 status_box.empty()
-                return response.content
+                return pdf_response.content
             else:
-                status_box.error(f"Sunucu hatası: {response.status_code}")
+                status_box.error(f"İndirme başarısız (Kod: {pdf_response.status_code})")
                 return None
-
-        except Exception as e:
-            status_box.warning("⚠️ İndirme butonu bulunamadı.")
+        else:
+            status_box.error("❌ Sayfada PDF linki bulunamadı.")
             return None
 
     except Exception as e:
-        status_box.error(f"Tarayıcı Hatası: {e}")
+        status_box.error(f"Bağlantı Hatası: {e}")
         return None
-    finally:
-        if driver:
-            driver.quit()
 
 # ========================================================
-# ARAYÜZ YAPILANDIRMASI
+# ARAYÜZ
 # ========================================================
 st.title("🌍 Harici Kaynaklar & Canlı Arama")
 tab1, tab2 = st.tabs(["📜 HTU Arşivi", "🤖 DergiPark Botu"])
@@ -284,7 +218,6 @@ with tab1:
     col1, col2 = st.columns([4,1])
     search_term = col1.text_input("HTU Yayını Ara (NO veya İsim):", placeholder="Örn: 2662, Tanin...")
     
-    # Otomatik yükleme
     with st.spinner("Tüm arşiv (Agresif Mod) taranıyor..."):
         df = htu_verilerini_getir()
     
@@ -316,14 +249,14 @@ with tab1:
             with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zf:
                 for idx, row in enumerate(selected_rows.itertuples()):
                     safe_title = re.sub(r'[\\/*?:"<>|]', "", row.BAŞLIK)[:40]
-                    safe_filename = f"{row._2}_{safe_title}" # row._2 = HTU NO
+                    safe_filename = f"{row._2}_{safe_title}" 
                     
                     if row.LINK.endswith(".djvu"):
                         c, m = download_and_process_djvu(row.LINK, safe_filename)
                         if c: zf.writestr(f"{safe_filename}.djvu", c)
                         else: zf.writestr(f"{safe_filename}_HATA.txt", m)
                     else:
-                        zf.writestr(f"{safe_filename}_LINK.txt", f"Bu bir klasör veya HTML linkidir: {row.LINK}")
+                        zf.writestr(f"{safe_filename}_LINK.txt", f"Link: {row.LINK}")
                     progress_bar.progress((idx + 1) / len(selected_rows))
             st.download_button("💾 ZIP Kaydet", zip_buffer.getvalue(), "HTU_Arsiv.zip", "application/zip")
 
@@ -351,7 +284,8 @@ with tab2:
                 with col_a:
                     if unique_key not in st.session_state.dergipark_cache:
                         if st.button("📥 PDF Hazırla", key=f"btn_{unique_key}"):
-                            pdf_data = fetch_pdf_content(makale['link'])
+                            # YENİ FONKSİYONU KULLANIYORUZ
+                            pdf_data = fetch_pdf_smart(makale['link'])
                             if pdf_data:
                                 st.session_state.dergipark_cache[unique_key] = pdf_data
                                 st.rerun()
