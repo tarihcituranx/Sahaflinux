@@ -20,3 +20,4 @@ duckduckgo-search
 streamlit
 yt-dlp
 requests
+cloudscraper
