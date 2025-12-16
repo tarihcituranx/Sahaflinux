@@ -17,3 +17,6 @@ pdf2image
 cloudscraper
 googlesearch-python
 duckduckgo-search
+streamlit
+yt-dlp
+requests
