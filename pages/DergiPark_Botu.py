@@ -17,9 +17,9 @@ st.set_page_config(page_title="Harici Kaynaklar", page_icon="🌍", layout="wide
 with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
     st.success("✅ HTU: Aktif")
-    st.info("✅ DergiPark: Tarayıcı Tabanlı İndirme")
+    st.success("✅ DergiPark: Garantici Mod")
     st.markdown("---")
-    st.caption("Bu modda doğrulama ekranı çıkarsa, yeni sekmede kendiniz doğrulayıp indirebilirsiniz.")
+    st.info("💡 İpucu: PDF butonu çıkmazsa 'Makaleye Git' butonunu kullanın.")
 
 # --- URL DÜZELTİCİ ---
 def fix_url(link):
@@ -87,7 +87,7 @@ def download_and_process_djvu(url, filename):
 
 
 # ========================================================
-# 2. DERGİPARK (LİNK BULUCU MOD)
+# 2. DERGİPARK (GARANTİCİ LİNK BULUCU)
 # ========================================================
 
 def search_dergipark_brave(keyword, count=15):
@@ -120,27 +120,33 @@ def search_dergipark_brave(keyword, count=15):
 
 def get_real_pdf_link(article_url):
     """
-    Sadece linki bulur. İndirmeyi kullanıcıya bırakır.
+    Sadece linki bulur. Makale ID'si ile Dosya ID'sini karıştırmaz.
     """
     scraper = cloudscraper.create_scraper()
     try:
-        # Sadece HTML'i çekip linki ayıklayacağız
         response = scraper.get(article_url, timeout=10)
+        
+        # Eğer sayfa 404 veriyorsa direkt çık
+        if response.status_code != 200:
+            return None
+            
         soup = BeautifulSoup(response.text, 'lxml')
         
-        # 1. Öncelik: Meta Etiketi (En temiz link buradadır)
+        # 1. Öncelik: Meta Etiketi (En doğrusu budur)
         meta_tag = soup.find("meta", {"name": "citation_pdf_url"})
         if meta_tag:
             return fix_url(meta_tag.get("content"))
         
-        # 2. Öncelik: Buton
+        # 2. Öncelik: Sayfa içi butonlar
+        # Sadece "download/article-file" içerenleri alıyoruz.
+        # "article/" linklerini alırsak 404 olur, onları eliyoruz.
         all_links = soup.find_all('a', href=True)
         for link in all_links:
-            if 'download/article-file' in link['href']:
-                return fix_url(link['href'])
+            href = link['href']
+            if 'download/article-file' in href:
+                return fix_url(href)
                 
     except Exception as e:
-        # Hata olsa bile en azından makale linkini döndür, kullanıcı oradan indirsin
         return None
     return None
 
@@ -193,7 +199,7 @@ with tab1:
                     progress_bar.progress((idx + 1) / len(selected_rows))
             st.download_button("💾 ZIP Kaydet", zip_buffer.getvalue(), "HTU_Arsiv.zip", "application/zip")
 
-# --- SEKME 2: DERGİPARK (LİNK MODU) ---
+# --- SEKME 2: DERGİPARK ---
 with tab2:
     st.header("🤖 DergiPark Makale Avcısı")
     with st.form("dp_form"):
@@ -204,12 +210,11 @@ with tab2:
     if 'dp_results' not in st.session_state:
         st.session_state.dp_results = []
     
-    # Bulunan linkleri hafızada tutmak için
     if 'found_links' not in st.session_state:
         st.session_state.found_links = {}
 
     if dp_btn and dp_kelime:
-        st.session_state.found_links = {} # Yeni aramada temizle
+        st.session_state.found_links = {} 
         with st.spinner("🦁 Brave arşivleri tarıyor..."):
             st.session_state.dp_results = search_dergipark_brave(dp_kelime)
 
@@ -224,24 +229,30 @@ with tab2:
                 unique_key = f"dp_{i}"
                 
                 with col_a:
-                    # Eğer linki daha önce bulduysak direkt butonu göster
+                    # Link daha önce bulunduysa göster
                     if unique_key in st.session_state.found_links:
-                        final_link = st.session_state.found_links[unique_key]
-                        st.link_button("📥 PDF'İ İNDİR (Yeni Sekme)", final_link, type="primary")
+                        status, link = st.session_state.found_links[unique_key]
+                        
+                        if status == "PDF":
+                            st.link_button("📥 PDF'İ İNDİR (Yeni Sekme)", link, type="primary")
+                        else:
+                            st.link_button("📄 MAKALEYE GİT", link)
                     
-                    # Henüz bulmadıysak "Hazırla" butonu göster
+                    # Henüz işlem yapılmadıysa
                     else:
                         if st.button("🔍 PDF Linkini Bul", key=f"btn_{unique_key}"):
-                            with st.spinner("Link çözümleniyor..."):
+                            with st.spinner("Adres çözümleniyor..."):
                                 pdf_link = get_real_pdf_link(makale['link'])
                                 
                                 if pdf_link:
-                                    st.session_state.found_links[unique_key] = pdf_link
-                                    st.rerun() # Sayfayı yenile ve butonu getir
+                                    # Başarılı: PDF linkini kaydet
+                                    st.session_state.found_links[unique_key] = ("PDF", pdf_link)
+                                    st.rerun()
                                 else:
-                                    st.error("PDF linki gizli.")
-                                    # Linki bulamazsa bari makale linkini verelim
-                                    st.link_button("Siteye Git ve İndir", makale['link'])
+                                    # Başarısız: Makale ana sayfasını kaydet (404 almasın diye)
+                                    st.warning("PDF linki gizli. Makale sayfasına yönlendiriliyorsunuz.")
+                                    st.session_state.found_links[unique_key] = ("PAGE", makale['link'])
+                                    st.rerun()
 
                 with col_b:
                     st.markdown(f"👉 **[Makale Sayfasına Git]({makale['link']})**")
