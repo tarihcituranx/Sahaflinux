@@ -23,6 +23,7 @@ try:
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
+    from selenium.webdriver.common.keys import Keys # Klavye tuşları için
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
     from webdriver_manager.chrome import ChromeDriverManager
@@ -41,7 +42,7 @@ with st.sidebar:
     st.success("✅ HTU: Aktif")
     st.success("✅ DergiPark: Aktif")
     st.success("✅ Gutenberg: Aktif")
-    st.success("✅ Sidestone: Hybrid Hack Modu")
+    st.success("✅ Sidestone: Advanced Hack")
     st.markdown("---")
 
 # --- URL DÜZELTİCİ ---
@@ -156,7 +157,6 @@ def get_selenium_driver():
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    # Kullanıcı Ajanı (Önemli: Bot gibi görünmemek için)
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
     
     try:
@@ -174,7 +174,7 @@ def get_selenium_driver():
 
 def convert_html_to_pdf_selenium(html_url):
     """
-    Sayfayı aşağı kaydırarak (Lazy Load Tetikleme) yazdırır.
+    Sayfayı 'Page Down' tuşlarıyla aşağı kaydırarak yazdırır.
     """
     status_box = st.empty()
     status_box.info("🚀 Chrome motoru başlatılıyor...")
@@ -185,24 +185,27 @@ def convert_html_to_pdf_selenium(html_url):
     try:
         status_box.info("📄 Sayfa yükleniyor...")
         driver.get(html_url)
-        time.sleep(5) # İlk yükleme beklemesi
+        time.sleep(5)
 
-        # --- AUTO-SCROLL (LAZY LOAD TETİKLEYİCİ) ---
-        status_box.info("🔄 Sayfalar yükleniyor (Aşağı kaydırılıyor)...")
-        last_height = driver.execute_script("return document.body.scrollHeight")
+        # --- GÜÇLÜ KAYDIRMA (KEYBOARD SIMULATION) ---
+        status_box.info("🔄 Sayfalar yükleniyor (Klavye simülasyonu)...")
         
-        # Yavaş yavaş aşağı in (Hızlı inerse yüklenmeyebilir)
-        for i in range(1, 10): # Maksimum 10 adımda inelim (çok uzun sürmesin)
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight * arguments[0] / 10);", i)
-            time.sleep(1) # Her adımda bekle
+        # 'body' elementine odaklan
+        body = driver.find_element(By.TAG_NAME, 'body')
         
-        # En sona git ve biraz daha bekle
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        # 15 kez 'Page Down' tuşuna bas (Kitap uzunluğuna göre artırılabilir)
+        # Her basışta 1 saniye bekle ki içerik yüklensin
+        for i in range(15):
+            body.send_keys(Keys.PAGE_DOWN)
+            time.sleep(1) 
+        
+        # En sona geldiğinden emin ol
+        body.send_keys(Keys.END)
         time.sleep(3)
         
-        # En başa dön (Bazen yazdırma için gerekir)
-        driver.execute_script("window.scrollTo(0, 0);")
-        time.sleep(1)
+        # Başa dön
+        body.send_keys(Keys.HOME)
+        time.sleep(2)
 
         status_box.info("🖨️ PDF basılıyor...")
         pdf_data = driver.execute_cdp_cmd("Page.printToPDF", {
@@ -287,15 +290,15 @@ def search_gutenberg(keyword):
     except: return []
 
 # ========================================================
-# 5. SIDESTONE PRESS (HYBRID HACK)
+# 5. SIDESTONE PRESS (HYBRID HACK V2)
 # ========================================================
 def download_sidestone_native_pdf_selenium(viewer_url):
     """
-    Selenium ile sayfaya girip 'iv' token'ını ve cookie'leri canlı çeker.
-    Sonra requests ile dosyayı indirir.
+    Sayfa kaynağını Regex ile tarar (DOM'da bulamazsa bile bulur).
+    Cookie'leri çalar ve POST atar.
     """
     status_box = st.empty()
-    status_box.info("🕵️‍♂️ Tarayıcı başlatılıyor (Token Avı)...")
+    status_box.info("🕵️‍♂️ Tarayıcı başlatılıyor (Saldırı Modu)...")
     
     driver = get_selenium_driver()
     if not driver: return None
@@ -303,34 +306,49 @@ def download_sidestone_native_pdf_selenium(viewer_url):
     try:
         # 1. Sayfaya Git
         driver.get(viewer_url)
+        status_box.info("⏳ Kaynak kod taranıyor...")
+        time.sleep(5) # İyice yüklensin
         
-        # 2. Sayfanın tamamen yüklenmesini ve IV elementinin oluşmasını bekle
-        status_box.info("⏳ Sayfa yükleniyor, anahtar bekleniyor...")
-        try:
-            # 'iv' isimli input elementini bekle (maks 15 saniye)
-            WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.NAME, "iv"))
-            )
-        except:
-            status_box.warning("IV elementi normal yolla bulunamadı, kaynak kod taranıyor...")
-
-        # 3. IV Değerini Çek (JavaScript ile en garantisi)
-        iv_token = driver.execute_script("return document.getElementsByName('iv')[0].value;")
+        # 2. KAYNAK KODU ÇEK
+        page_source = driver.page_source
+        
+        # 3. REGEX İLE IV TOKEN ARA (En garantisi budur)
+        # Farklı varyasyonları dene:
+        # name="iv" value="TOKEN"
+        # var iv = 'TOKEN'
+        # iv: "TOKEN"
+        
+        iv_token = None
+        
+        # Desen 1: Input value
+        match1 = re.search(r'name=["\']iv["\']\s+value=["\']([^"\']+)["\']', page_source)
+        if match1: iv_token = match1.group(1)
+        
+        # Desen 2: JS variable
+        if not iv_token:
+            match2 = re.search(r'var\s+iv\s*=\s*[\'"]([^\'"]+)[\'"]', page_source)
+            if match2: iv_token = match2.group(1)
+            
+        if not iv_token:
+            # Son çare JS ile çekmeyi dene
+            try:
+                iv_token = driver.execute_script("return document.getElementsByName('iv')[0].value;")
+            except: pass
         
         if not iv_token:
-            status_box.error("❌ Gizli anahtar (IV) bulunamadı.")
+            status_box.error("❌ Anahtar bulunamadı. Site yapısı değişmiş olabilir.")
             return None
             
-        status_box.success(f"🔑 Anahtar yakalandı!")
+        status_box.success(f"🔑 Anahtar yakalandı: {iv_token[:10]}...")
         
         # 4. Cookie'leri Çal
         cookies = driver.get_cookies()
         session_cookies = {cookie['name']: cookie['value'] for cookie in cookies}
         
-        # 5. İndirme Linkini Hazırla
+        # 5. İndirme Linki
         pdf_target_url = viewer_url + ".pdf"
         
-        # 6. POST İsteği At (Requests kütüphanesiyle)
+        # 6. POST İsteği
         headers = {
             "Referer": viewer_url,
             "User-Agent": driver.execute_script("return navigator.userAgent;"),
@@ -339,20 +357,18 @@ def download_sidestone_native_pdf_selenium(viewer_url):
         
         payload = {"iv": iv_token}
         
-        status_box.info("📥 Orijinal dosya indiriliyor...")
-        
-        # Cookie'leri ve Token'ı kullanarak istek at
+        status_box.info("📥 Dosya sunucudan sökülüyor...")
         r = requests.post(pdf_target_url, headers=headers, data=payload, cookies=session_cookies, stream=True)
         
         if r.status_code == 200:
             status_box.empty()
             return r.content
         else:
-            status_box.error(f"Sunucu erişimi reddetti (Kod: {r.status_code})")
+            status_box.error(f"Sunucu hatası: {r.status_code}")
             return None
 
     except Exception as e:
-        status_box.error(f"Hack Hatası: {e}")
+        status_box.error(f"Hata: {e}")
         return None
     finally:
         driver.quit()
@@ -414,17 +430,20 @@ def search_sidestone(keyword):
                 if not title_a: continue
                 link = title_a['href']
                 title = title_a.find('h1').get_text(strip=True)
-                
+                author = "Bilinmiyor"
                 author_h2 = div.find('h2', style=re.compile(r'margin-top'))
-                author = author_h2.get_text(strip=True) if author_h2 else "Bilinmiyor"
+                if author_h2: author = author_h2.get_text(strip=True)
                 
+                img_src = None
                 parent = div.parent
                 img_tag = parent.find('img')
-                img_src = img_tag['src'] if img_tag else None
-                if img_src and not img_src.startswith("http"): img_src = base_url + img_src
+                if img_tag:
+                    img_src = img_tag['src']
+                    if not img_src.startswith("http"): img_src = base_url + img_src
                 
+                desc = ""
                 desc_tag = div.find('p')
-                desc = desc_tag.get_text(strip=True) if desc_tag else ""
+                if desc_tag: desc = desc_tag.get_text(strip=True)
                 
                 books.append({"title": title, "author": author, "link": link, "image": img_src, "desc": desc})
             except: continue
