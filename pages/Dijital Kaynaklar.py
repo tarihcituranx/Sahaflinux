@@ -589,7 +589,7 @@ with tab4:
     elif ss_btn: st.error("😔 Kaynak Bulunamadı.")
 
 # --- SEKME 8: CORE (YENİ) ---
-with tabs[7]:
+with tab7:
     st.header("🌐 CORE (Global Open Access)")
     st.info("Dünya çapında akademik arşivleri tarar (Selenium destekli).")
     
@@ -609,14 +609,10 @@ with tabs[7]:
         
         for item in st.session_state.cr_results:
             with st.container():
-                # Başlık (Çeviri ve Orijinal)
                 st.subheader(item['title_tr'])
                 st.caption(f"🇬🇧 Orijinal: {item['title']}")
-                
-                # Yazar
                 st.markdown(f"✍️ **Yazar:** {item['author']}")
                 
-                # Özet (Varsa)
                 if item['abstract_tr']:
                     with st.expander("📝 Özeti Oku"):
                         st.write(item['abstract_tr'])
