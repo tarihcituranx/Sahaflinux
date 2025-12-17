@@ -330,11 +330,77 @@ def search_sidestone(keyword):
     except: return []
 
 # ========================================================
-# ARAYÜZ
+# 8. CORE (CORE.AC.UK) - YENİ MODÜL
 # ========================================================
-st.title("🌍 Harici Kaynaklar & Canlı Arama")
-tab1, tab2, tab3, tab4 = st.tabs(["📜 HTU Arşivi", "🤖 DergiPark", "📚 Gutenberg", "🏛️ Sidestone"])
+def search_core_selenium(keyword):
+    """
+    CORE (core.ac.uk) üzerinde arama yapar ve çevirili sonuç döndürür.
+    """
+    driver = get_selenium_driver()
+    if not driver: return []
+    
+    results = []
+    search_url = f"https://core.ac.uk/search?q={keyword}"
+    
+    try:
+        driver.get(search_url)
+        # Sonuçların yüklenmesini bekle
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "search-result"))
+        )
+        
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        cards = soup.find_all("div", class_="search-result")
+        
+        for card in cards:
+            try:
+                # Başlık ve Link
+                title_tag = card.find("a", href=True)
+                if not title_tag: continue
+                
+                title = title_tag.get_text(strip=True)
+                link = title_tag['href']
+                if not link.startswith("http"):
+                    link = "https://core.ac.uk" + link
+                    
+                # Yazar
+                author_tag = card.find("div", class_="authors")
+                author = author_tag.get_text(strip=True) if author_tag else "Yazar belirtilmemiş"
+                
+                # Özet
+                abstract_tag = card.find("div", class_="abstract")
+                abstract = abstract_tag.get_text(strip=True) if abstract_tag else ""
+                
+                # PDF Linki
+                pdf_link = None
+                for a in card.find_all("a", href=True):
+                    if "pdf" in a.get_text().lower() or "download" in a['href']:
+                        pdf_link = a['href']
+                        break
+                
+                results.append({
+                    "title": title,
+                    "title_tr": translate_to_turkish(title),
+                    "author": author,
+                    "link": link,
+                    "pdf": pdf_link,
+                    "abstract": abstract,
+                    "abstract_tr": translate_to_turkish(abstract) if abstract else ""
+                })
+                
+            except: continue
+            
+    except Exception as e:
+        print(f"CORE Hatası: {e}")
+    finally:
+        driver.quit()
+        
+    return results
 
+# ========================================================
+# ARAYÜZ
+# Mevcut satırı bununla değiştir:
+tabs = st.tabs(["📜 HTU", "🤖 DergiPark", "📚 Gutenberg", "🏛️ Sidestone", "🏛️ JSTOR", "🇹🇷 Harman", "🌐 CORE"])
 # --- SEKME 1: HTU ---
 with tab1:
     col1, col2 = st.columns([4,1])
