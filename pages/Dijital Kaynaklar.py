@@ -2,26 +2,29 @@ import streamlit as st
 import requests
 import pandas as pd
 from io import BytesIO
-import zipfile
 from bs4 import BeautifulSoup
 import urllib3
 import cloudscraper
 import re
 import base64
 import time
+import json
 
 # ÇEVİRİ KÜTÜPHANESİ
 try:
     from deep_translator import GoogleTranslator
 except ImportError:
-    st.error("⚠️ deep-translator eksik! Lütfen requirements.txt dosyasına ekleyin.")
+    st.error("⚠️ deep-translator eksik! requirements.txt kontrol edin.")
     st.stop()
 
-# SELENIUM (PDF Dönüştürme ve Render İçin)
+# SELENIUM
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
     from webdriver_manager.chrome import ChromeDriverManager
 except ImportError:
     st.error("Selenium modülleri eksik.")
@@ -38,7 +41,7 @@ with st.sidebar:
     st.success("✅ HTU: Aktif")
     st.success("✅ DergiPark: Aktif")
     st.success("✅ Gutenberg: Aktif")
-    st.success("✅ Sidestone: IV Token Hack Aktif")
+    st.success("✅ Sidestone: Hybrid Hack Modu")
     st.markdown("---")
 
 # --- URL DÜZELTİCİ ---
@@ -145,20 +148,17 @@ def get_real_pdf_link(article_url):
     return None
 
 # ========================================================
-# 3. ORTAK ARAÇLAR (GUTENBERG & SIDESTONE)
+# 3. YARDIMCI ARAÇLAR (PDF & SELENIUM)
 # ========================================================
-def convert_html_to_pdf_selenium(html_url):
-    """
-    Sayfayı 'Yazdır' diyerek PDF yapar (Fallback Yöntemi).
-    """
-    status_box = st.empty()
-    status_box.info("🚀 Chrome ile sayfa yazdırılıyor...")
+def get_selenium_driver():
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = None
+    # Kullanıcı Ajanı (Önemli: Bot gibi görünmemek için)
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    
     try:
         import os
         service = None
@@ -167,17 +167,58 @@ def convert_html_to_pdf_selenium(html_url):
             service = Service("/usr/bin/chromedriver")
         else:
             service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+        return webdriver.Chrome(service=service, options=chrome_options)
+    except Exception as e:
+        st.error(f"Driver Hatası: {e}")
+        return None
+
+def convert_html_to_pdf_selenium(html_url):
+    """
+    Sayfayı aşağı kaydırarak (Lazy Load Tetikleme) yazdırır.
+    """
+    status_box = st.empty()
+    status_box.info("🚀 Chrome motoru başlatılıyor...")
+    
+    driver = get_selenium_driver()
+    if not driver: return None
+
+    try:
+        status_box.info("📄 Sayfa yükleniyor...")
         driver.get(html_url)
+        time.sleep(5) # İlk yükleme beklemesi
+
+        # --- AUTO-SCROLL (LAZY LOAD TETİKLEYİCİ) ---
+        status_box.info("🔄 Sayfalar yükleniyor (Aşağı kaydırılıyor)...")
+        last_height = driver.execute_script("return document.body.scrollHeight")
+        
+        # Yavaş yavaş aşağı in (Hızlı inerse yüklenmeyebilir)
+        for i in range(1, 10): # Maksimum 10 adımda inelim (çok uzun sürmesin)
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight * arguments[0] / 10);", i)
+            time.sleep(1) # Her adımda bekle
+        
+        # En sona git ve biraz daha bekle
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(3)
-        pdf_data = driver.execute_cdp_cmd("Page.printToPDF", {"printBackground": True, "paperWidth": 8.27, "paperHeight": 11.69})
+        
+        # En başa dön (Bazen yazdırma için gerekir)
+        driver.execute_script("window.scrollTo(0, 0);")
+        time.sleep(1)
+
+        status_box.info("🖨️ PDF basılıyor...")
+        pdf_data = driver.execute_cdp_cmd("Page.printToPDF", {
+            "printBackground": True, 
+            "paperWidth": 8.27, 
+            "paperHeight": 11.69,
+            "marginTop": 0.4, "marginBottom": 0.4, "marginLeft": 0.4, "marginRight": 0.4
+        })
+        
         status_box.empty()
         return base64.b64decode(pdf_data['data'])
     except Exception as e: 
-        status_box.error(f"Hata: {str(e)}")
+        status_box.error(f"Dönüştürme Hatası: {str(e)}")
         return None
     finally:
-        if driver: driver.quit()
+        driver.quit()
 
 # ========================================================
 # 4. PROJECT GUTENBERG
@@ -246,61 +287,75 @@ def search_gutenberg(keyword):
     except: return []
 
 # ========================================================
-# 5. SIDESTONE PRESS (IV HACK + METADATA)
+# 5. SIDESTONE PRESS (HYBRID HACK)
 # ========================================================
-def download_sidestone_native_pdf(viewer_url):
+def download_sidestone_native_pdf_selenium(viewer_url):
     """
-    HTML içindeki gizli 'iv' token'ını bulur ve POST isteği atarak
-    ORİJİNAL PDF'i indirir.
+    Selenium ile sayfaya girip 'iv' token'ını ve cookie'leri canlı çeker.
+    Sonra requests ile dosyayı indirir.
     """
     status_box = st.empty()
-    status_box.info("🕵️‍♂️ IV anahtarı aranıyor...")
+    status_box.info("🕵️‍♂️ Tarayıcı başlatılıyor (Token Avı)...")
     
-    # Cloudscraper kullanıyoruz çünkü site bazen botları engeller
-    scraper = cloudscraper.create_scraper()
+    driver = get_selenium_driver()
+    if not driver: return None
     
     try:
-        # 1. Viewer Sayfasını Çek
-        response = scraper.get(viewer_url, timeout=15)
-        if response.status_code != 200:
-            status_box.error("Viewer sayfası açılamadı.")
-            return None
-            
-        # 2. IV Token'ı Regex ile Bul
-        # Genelde: name="iv" value="TOKEN" veya var iv = 'TOKEN'
-        iv_match = re.search(r'name=["\']iv["\']\s+value=["\']([^"\']+)["\']', response.text)
-        if not iv_match:
-            status_box.warning("Gizli IV anahtarı bulunamadı. Baskı yöntemi deneyin.")
-            return None
-            
-        iv_token = iv_match.group(1)
-        status_box.info(f"✅ Anahtar bulundu: {iv_token[:10]}...")
+        # 1. Sayfaya Git
+        driver.get(viewer_url)
         
-        # 3. PDF İndirme İsteği (POST)
-        # URL genellikle viewer URL'inin sonuna .pdf eklenmiş halidir
+        # 2. Sayfanın tamamen yüklenmesini ve IV elementinin oluşmasını bekle
+        status_box.info("⏳ Sayfa yükleniyor, anahtar bekleniyor...")
+        try:
+            # 'iv' isimli input elementini bekle (maks 15 saniye)
+            WebDriverWait(driver, 15).until(
+                EC.presence_of_element_located((By.NAME, "iv"))
+            )
+        except:
+            status_box.warning("IV elementi normal yolla bulunamadı, kaynak kod taranıyor...")
+
+        # 3. IV Değerini Çek (JavaScript ile en garantisi)
+        iv_token = driver.execute_script("return document.getElementsByName('iv')[0].value;")
+        
+        if not iv_token:
+            status_box.error("❌ Gizli anahtar (IV) bulunamadı.")
+            return None
+            
+        status_box.success(f"🔑 Anahtar yakalandı!")
+        
+        # 4. Cookie'leri Çal
+        cookies = driver.get_cookies()
+        session_cookies = {cookie['name']: cookie['value'] for cookie in cookies}
+        
+        # 5. İndirme Linkini Hazırla
         pdf_target_url = viewer_url + ".pdf"
         
+        # 6. POST İsteği At (Requests kütüphanesiyle)
         headers = {
-            "Referer": viewer_url, # Bu çok önemli, yoksa 403 verir
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "Referer": viewer_url,
+            "User-Agent": driver.execute_script("return navigator.userAgent;"),
+            "Content-Type": "application/x-www-form-urlencoded"
         }
         
         payload = {"iv": iv_token}
         
-        status_box.info("📥 Orijinal dosya sunucudan çekiliyor...")
-        pdf_response = scraper.post(pdf_target_url, headers=headers, data=payload, stream=True)
+        status_box.info("📥 Orijinal dosya indiriliyor...")
         
-        if pdf_response.status_code == 200:
+        # Cookie'leri ve Token'ı kullanarak istek at
+        r = requests.post(pdf_target_url, headers=headers, data=payload, cookies=session_cookies, stream=True)
+        
+        if r.status_code == 200:
             status_box.empty()
-            return pdf_response.content
+            return r.content
         else:
-            status_box.error(f"Sunucu reddetti: {pdf_response.status_code}")
+            status_box.error(f"Sunucu erişimi reddetti (Kod: {r.status_code})")
             return None
-            
+
     except Exception as e:
-        status_box.error(f"Hata: {e}")
+        status_box.error(f"Hack Hatası: {e}")
         return None
+    finally:
+        driver.quit()
 
 def get_sidestone_details(book_url):
     try:
@@ -359,20 +414,17 @@ def search_sidestone(keyword):
                 if not title_a: continue
                 link = title_a['href']
                 title = title_a.find('h1').get_text(strip=True)
-                author = "Bilinmiyor"
-                author_h2 = div.find('h2', style=re.compile(r'margin-top'))
-                if author_h2: author = author_h2.get_text(strip=True)
                 
-                img_src = None
+                author_h2 = div.find('h2', style=re.compile(r'margin-top'))
+                author = author_h2.get_text(strip=True) if author_h2 else "Bilinmiyor"
+                
                 parent = div.parent
                 img_tag = parent.find('img')
-                if img_tag:
-                    img_src = img_tag['src']
-                    if not img_src.startswith("http"): img_src = base_url + img_src
+                img_src = img_tag['src'] if img_tag else None
+                if img_src and not img_src.startswith("http"): img_src = base_url + img_src
                 
-                desc = ""
                 desc_tag = div.find('p')
-                if desc_tag: desc = desc_tag.get_text(strip=True)
+                desc = desc_tag.get_text(strip=True) if desc_tag else ""
                 
                 books.append({"title": title, "author": author, "link": link, "image": img_src, "desc": desc})
             except: continue
@@ -481,7 +533,7 @@ with tab3:
                         st.info(f"🗣️ **Dil:** {details['language']}\n\n📂 **Kategori:** {details['category']}")
                         if details['epub_link']: st.link_button("📱 EPUB İndir", details['epub_link'])
                         if details['html_link']:
-                            if st.button("📄 PDF Yap ve İndir", key=f"pdf_gen_{unique_gb_key}"):
+                            if st.button("📄 PDF Yap ve İndir (Auto-Scroll)", key=f"pdf_gen_{unique_gb_key}"):
                                 pdf_bytes = convert_html_to_pdf_selenium(details['html_link'])
                                 if pdf_bytes:
                                     clean_name = re.sub(r'[\\/*?:"<>|]', "", book['title'])[:30] + ".pdf"
@@ -533,43 +585,38 @@ with tab4:
                     if unique_ss_key in st.session_state.ss_cache:
                         details = st.session_state.ss_cache[unique_ss_key]
                         
-                        # 1. Açık PDF
                         if details['pdf_link']:
                             st.link_button("📥 PDF İndir (Direkt)", details['pdf_link'], type="primary")
                         
-                        # 2. Online Oku + Hack İndirme
                         if details['read_link']:
                             st.link_button("📖 Tarayıcıda Oku", details['read_link'])
                             
-                            # A) Orijinal Hack İndirme (Yeni)
+                            # 1. HACK İNDİRME
                             if st.button("🗝️ Orijinal PDF'i Çek (Hack)", key=f"hack_ss_{unique_ss_key}"):
-                                pdf_bytes = download_sidestone_native_pdf(details['read_link'])
+                                pdf_bytes = download_sidestone_native_pdf_selenium(details['read_link'])
                                 if pdf_bytes:
                                     clean_name = re.sub(r'[\\/*?:"<>|]', "", book['title'])[:30] + ".pdf"
                                     st.download_button("💾 ORİJİNAL İNDİR", pdf_bytes, clean_name, "application/pdf", key=f"dl_hack_{unique_ss_key}", type="primary")
                             
-                            # B) Sayfa Yazdırma (Yedek)
-                            if st.button("📄 Sayfayı Yazdırarak PDF Yap", key=f"print_ss_{unique_ss_key}"):
-                                with st.spinner("Sayfa işleniyor..."):
+                            # 2. YAZDIRMA (YEDEK)
+                            if st.button("📄 Sayfayı Yazdır (Auto-Scroll)", key=f"print_ss_{unique_ss_key}"):
+                                with st.spinner("Sayfa taranıyor ve yazdırılıyor..."):
                                     pdf_bytes = convert_html_to_pdf_selenium(details['read_link'])
                                     if pdf_bytes:
                                         clean_name = re.sub(r'[\\/*?:"<>|]', "", book['title'])[:30] + "_Print.pdf"
                                         st.download_button("💾 PDF OLARAK KAYDET", pdf_bytes, clean_name, "application/pdf", key=f"dl_print_{unique_ss_key}")
 
                         if details['abstract_tr']:
-                            st.markdown("### 📝 Geniş Özet (Abstract)")
+                            st.markdown("### 📝 Geniş Özet")
                             st.write(details['abstract_tr'])
-                            with st.expander("🇬🇧 Orijinal Özeti Gör"): st.write(details['abstract_orig'])
+                            with st.expander("🇬🇧 Orijinal"): st.write(details['abstract_orig'])
                         
                         if details['contents_tr']:
-                            with st.expander("📑 İçindekiler (TOC)"):
+                            with st.expander("📑 İçindekiler"):
                                 st.text(details['contents_tr'])
-                                st.divider()
-                                st.caption("Orijinal Liste:")
-                                st.text(details['contents_orig'])
                     else:
                         if st.button("🔍 İndirme, Özet & TOC", key=f"ss_meta_{unique_ss_key}"):
-                            with st.spinner("Veriler çekiliyor ve çevriliyor..."):
+                            with st.spinner("Veriler çekiliyor..."):
                                 details = get_sidestone_details(book['link'])
                                 if details:
                                     details['title_tr'] = translate_to_turkish(book['title'])
