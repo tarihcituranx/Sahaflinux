@@ -40,8 +40,9 @@ with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
     st.success("✅ HTU: Aktif")
     st.success("✅ DergiPark: Aktif")
-    st.success("✅ Gutenberg: PDF Dönüştürücü")
-    st.success("✅ Sidestone: Link & Çeviri")
+    st.success("✅ Gutenberg: Aktif")
+    st.success("✅ Sidestone: Aktif")
+    st.success("✅ CORE: Selenium Aktif")
     st.markdown("---")
 
 # --- URL DÜZELTİCİ ---
@@ -63,6 +64,48 @@ def translate_to_turkish(text):
         if len(text) > 4000: text = text[:4000]
         return GoogleTranslator(source='auto', target='tr').translate(text)
     except: return text
+
+# ========================================================
+# YARDIMCI ARAÇLAR (EKSİK OLAN KISIM EKLENDİ)
+# ========================================================
+def get_selenium_driver():
+    """
+    Selenium WebDriver'ı başlatır (Linux/Windows uyumlu).
+    """
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    # Bot korumasını aşmak için User-Agent
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+    
+    try:
+        import os
+        service = None
+        # Linux Sunucu Kontrolü (Streamlit Cloud için)
+        if os.path.exists("/usr/bin/chromium"):
+            chrome_options.binary_location = "/usr/bin/chromium"
+            service = Service("/usr/bin/chromedriver")
+        else:
+            # Lokal Bilgisayar (Windows/Mac)
+            service = Service(ChromeDriverManager().install())
+            
+        return webdriver.Chrome(service=service, options=chrome_options)
+    except Exception as e:
+        st.error(f"Driver Hatası: {e}")
+        return None
+
+def convert_html_to_pdf_selenium(html_url):
+    driver = get_selenium_driver()
+    if not driver: return None
+    try:
+        driver.get(html_url)
+        time.sleep(2)
+        pdf_data = driver.execute_cdp_cmd("Page.printToPDF", {"printBackground": True, "paperWidth": 8.27, "paperHeight": 11.69})
+        return base64.b64decode(pdf_data['data'])
+    except: return None
+    finally: driver.quit()
 
 # ========================================================
 # 1. HTU ARŞİVİ
@@ -148,47 +191,7 @@ def get_real_pdf_link(article_url):
     return None
 
 # ========================================================
-# 3. YARDIMCI ARAÇLAR (Gutenberg için Selenium)
-# ========================================================
-def convert_html_to_pdf_selenium(html_url):
-    """
-    Gutenberg HTML sayfalarını PDF yapar. Sidestone için kullanılmaz.
-    """
-    status_box = st.empty()
-    status_box.info("🚀 Chrome motoru başlatılıyor...")
-    
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    
-    driver = None
-    try:
-        import os
-        service = None
-        if os.path.exists("/usr/bin/chromium"):
-            chrome_options.binary_location = "/usr/bin/chromium"
-            service = Service("/usr/bin/chromedriver")
-        else:
-            service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        
-        status_box.info("📄 Sayfa işleniyor...")
-        driver.get(html_url)
-        time.sleep(2)
-        
-        pdf_data = driver.execute_cdp_cmd("Page.printToPDF", {"printBackground": True, "paperWidth": 8.27, "paperHeight": 11.69})
-        status_box.empty()
-        return base64.b64decode(pdf_data['data'])
-    except Exception as e: 
-        status_box.error(f"Dönüştürme Hatası: {str(e)}")
-        return None
-    finally:
-        if driver: driver.quit()
-
-# ========================================================
-# 4. PROJECT GUTENBERG
+# 3. PROJECT GUTENBERG
 # ========================================================
 def get_gutenberg_metadata(book_url):
     try:
@@ -254,7 +257,7 @@ def search_gutenberg(keyword):
     except: return []
 
 # ========================================================
-# 5. SIDESTONE PRESS (SADELEŞTİRİLMİŞ)
+# 5. SIDESTONE PRESS
 # ========================================================
 def get_sidestone_details(book_url):
     try:
@@ -334,7 +337,7 @@ def search_sidestone(keyword):
     except: return []
 
 # ========================================================
-# 8. CORE (CORE.AC.UK) - YENİ MODÜL
+# 8. CORE (CORE.AC.UK) - SELENIUM DESTEKLİ
 # ========================================================
 def search_core_selenium(keyword):
     """
@@ -403,8 +406,8 @@ def search_core_selenium(keyword):
 
 # ========================================================
 # ARAYÜZ
-# Sekmeleri tek tek değişkenlere ata (Böylece eski kodların bozulmaz)
-tab1, tab2, tab3, tab4, tab5, tab6, tab7,= st.tabs([
+# ========================================================
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📜 HTU", 
     "🤖 DergiPark", 
     "📚 Gutenberg", 
@@ -413,6 +416,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7,= st.tabs([
     "🇹🇷 Harman", 
     "🌐 CORE"
 ])
+
 # --- SEKME 1: HTU ---
 with tab1:
     col1, col2 = st.columns([4,1])
@@ -561,7 +565,6 @@ with tab4:
                     if unique_ss_key in st.session_state.ss_cache:
                         details = st.session_state.ss_cache[unique_ss_key]
                         
-                        # BUTONLAR (SADELEŞTİRİLMİŞ)
                         if details['pdf_link']:
                             st.link_button("📥 PDF İndir (Direkt)", details['pdf_link'], type="primary")
                         elif details['read_link']:
@@ -570,13 +573,11 @@ with tab4:
                             st.warning("Ücretsiz erişim bulunamadı.")
                             st.link_button("Siteye Git", book['link'])
 
-                        # ÖZET
                         if details['abstract_tr']:
                             st.markdown("### 📝 Geniş Özet")
                             st.write(details['abstract_tr'])
                             with st.expander("🇬🇧 Orijinal"): st.write(details['abstract_orig'])
                         
-                        # İÇİNDEKİLER
                         if details['contents_tr']:
                             with st.expander("📑 İçindekiler"):
                                 st.text(details['contents_tr'])
@@ -592,7 +593,15 @@ with tab4:
                 st.divider()
     elif ss_btn: st.error("😔 Kaynak Bulunamadı.")
 
-# --- SEKME 8: CORE (YENİ) ---
+# --- SEKME 5: JSTOR (BOŞ YER TUTUCU - LOGIC EKLENMELİ) ---
+with tab5:
+    st.info("JSTOR Arama modülü şu an devre dışı (User code'da logic yoktu).")
+
+# --- SEKME 6: HARMAN (BOŞ YER TUTUCU - LOGIC EKLENMELİ) ---
+with tab6:
+    st.info("Harman Arama modülü şu an devre dışı (User code'da logic yoktu).")
+
+# --- SEKME 7: CORE (YENİ) ---
 with tab7:
     st.header("🌐 CORE (Global Open Access)")
     st.info("Dünya çapında akademik arşivleri tarar (Selenium destekli).")
