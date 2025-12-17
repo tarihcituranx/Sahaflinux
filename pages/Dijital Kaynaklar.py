@@ -400,14 +400,13 @@ def search_core_selenium(keyword):
 # ========================================================
 # ARAYÜZ
 # Sekmeleri tek tek değişkenlere ata (Böylece eski kodların bozulmaz)
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7,= st.tabs([
     "📜 HTU", 
     "🤖 DergiPark", 
     "📚 Gutenberg", 
     "🏛️ Sidestone", 
     "🏛️ JSTOR", 
     "🇹🇷 Harman", 
-    "🗝️ Sci-Hub", 
     "🌐 CORE"
 ])
 # --- SEKME 1: HTU ---
