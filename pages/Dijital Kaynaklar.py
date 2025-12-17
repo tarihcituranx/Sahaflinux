@@ -399,8 +399,17 @@ def search_core_selenium(keyword):
 
 # ========================================================
 # ARAYÜZ
-# Mevcut satırı bununla değiştir:
-tabs = st.tabs(["📜 HTU", "🤖 DergiPark", "📚 Gutenberg", "🏛️ Sidestone", "🏛️ JSTOR", "🇹🇷 Harman", "🌐 CORE"])
+# Sekmeleri tek tek değişkenlere ata (Böylece eski kodların bozulmaz)
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "📜 HTU", 
+    "🤖 DergiPark", 
+    "📚 Gutenberg", 
+    "🏛️ Sidestone", 
+    "🏛️ JSTOR", 
+    "🇹🇷 Harman", 
+    "🗝️ Sci-Hub", 
+    "🌐 CORE"
+])
 # --- SEKME 1: HTU ---
 with tab1:
     col1, col2 = st.columns([4,1])
