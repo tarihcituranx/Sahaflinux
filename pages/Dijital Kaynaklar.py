@@ -579,3 +579,49 @@ with tab4:
                                 else: st.error("Bağlantı hatası.")
                 st.divider()
     elif ss_btn: st.error("😔 Kaynak Bulunamadı.")
+
+# --- SEKME 8: CORE (YENİ) ---
+with tabs[7]:
+    st.header("🌐 CORE (Global Open Access)")
+    st.info("Dünya çapında akademik arşivleri tarar (Selenium destekli).")
+    
+    with st.form("core_form"):
+        col1, col2 = st.columns([4,1])
+        cr_kelime = col1.text_input("Makale Ara (Global):", placeholder="Örn: Ataturk reforms...")
+        cr_btn = col2.form_submit_button("🌐 Ara")
+        
+    if 'cr_results' not in st.session_state: st.session_state.cr_results = []
+    
+    if cr_btn and cr_kelime:
+        with st.spinner("CORE arşivi taranıyor (Selenium)..."):
+            st.session_state.cr_results = search_core_selenium(cr_kelime)
+            
+    if st.session_state.cr_results:
+        st.success(f"✅ {len(st.session_state.cr_results)} sonuç bulundu.")
+        
+        for item in st.session_state.cr_results:
+            with st.container():
+                # Başlık (Çeviri ve Orijinal)
+                st.subheader(item['title_tr'])
+                st.caption(f"🇬🇧 Orijinal: {item['title']}")
+                
+                # Yazar
+                st.markdown(f"✍️ **Yazar:** {item['author']}")
+                
+                # Özet (Varsa)
+                if item['abstract_tr']:
+                    with st.expander("📝 Özeti Oku"):
+                        st.write(item['abstract_tr'])
+                        st.divider()
+                        st.caption(item['abstract'])
+                
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.link_button("🔗 Kaynağa Git", item['link'])
+                with col_b:
+                    if item['pdf']:
+                        st.link_button("📥 PDF İndir", item['pdf'], type="primary")
+                
+                st.divider()
+    elif cr_btn:
+        st.warning("Sonuç bulunamadı.")
