@@ -38,7 +38,7 @@ with st.sidebar:
     st.success("✅ HTU: Aktif")
     st.success("✅ DergiPark: Aktif")
     st.success("✅ Gutenberg: Aktif")
-    st.success("✅ Sidestone: Viewer Destekli")
+    st.success("✅ Sidestone: Abstract & TOC Aktif")
     st.markdown("---")
 
 # --- URL DÜZELTİCİ ---
@@ -57,6 +57,9 @@ def fix_url(link):
 def translate_to_turkish(text):
     if not text or len(text) < 3: return text
     try:
+        # Metin çok uzunsa parça parça çevirmek gerekebilir ama deep_translator genelde halleder.
+        # Yine de 5000 karakter sınırı varsa keselim.
+        if len(text) > 4000: text = text[:4000] + "..."
         return GoogleTranslator(source='auto', target='tr').translate(text)
     except: return text
 
@@ -146,7 +149,43 @@ def get_real_pdf_link(article_url):
     return None
 
 # ========================================================
-# 3. PROJECT GUTENBERG
+# 3. PDF CONVERTER MOTORU
+# ========================================================
+def convert_html_to_pdf_selenium(html_url):
+    status_box = st.empty()
+    status_box.info("🚀 Dönüştürme motoru çalışıyor...")
+    
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = None
+    try:
+        import os
+        service = None
+        if os.path.exists("/usr/bin/chromium"):
+            chrome_options.binary_location = "/usr/bin/chromium"
+            service = Service("/usr/bin/chromedriver")
+        else:
+            service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+        
+        driver.get(html_url)
+        time.sleep(3)
+        status_box.info("🖨️ PDF basılıyor...")
+        pdf_data = driver.execute_cdp_cmd("Page.printToPDF", {"printBackground": True, "paperWidth": 8.27, "paperHeight": 11.69, "marginTop": 0.4, "marginBottom": 0.4, "marginLeft": 0.4, "marginRight": 0.4})
+        
+        status_box.empty()
+        return base64.b64decode(pdf_data['data'])
+    except Exception as e: 
+        status_box.error(f"Hata: {str(e)}")
+        return None
+    finally:
+        if driver: driver.quit()
+
+# ========================================================
+# 4. PROJECT GUTENBERG
 # ========================================================
 def get_gutenberg_metadata(book_url):
     try:
@@ -187,30 +226,6 @@ def get_gutenberg_metadata(book_url):
         return data
     except: return None
 
-def convert_html_to_pdf_selenium(html_url):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = None
-    try:
-        import os
-        service = None
-        if os.path.exists("/usr/bin/chromium"):
-            chrome_options.binary_location = "/usr/bin/chromium"
-            service = Service("/usr/bin/chromedriver")
-        else:
-            service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.get(html_url)
-        time.sleep(2)
-        pdf_data = driver.execute_cdp_cmd("Page.printToPDF", {"printBackground": True, "paperWidth": 8.27, "paperHeight": 11.69})
-        return base64.b64decode(pdf_data['data'])
-    except: return None
-    finally:
-        if driver: driver.quit()
-
 def search_gutenberg(keyword):
     base_url = "https://www.gutenberg.org"
     search_url = f"{base_url}/ebooks/search/?query={keyword}"
@@ -236,7 +251,7 @@ def search_gutenberg(keyword):
     except: return []
 
 # ========================================================
-# 4. SIDESTONE PRESS (GELİŞMİŞ)
+# 5. SIDESTONE PRESS (FULL DETAYLI)
 # ========================================================
 def search_sidestone(keyword):
     base_url = "https://www.sidestone.com"
@@ -245,14 +260,12 @@ def search_sidestone(keyword):
         r = requests.get(search_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=20)
         soup = BeautifulSoup(r.text, 'html.parser')
         books = []
-        
         containers = soup.find_all('div', class_='small-12 medium-8 columns container')
         
         for div in containers:
             try:
                 title_a = div.find('a', class_='title')
                 if not title_a: continue
-                
                 link = title_a['href']
                 title = title_a.find('h1').get_text(strip=True)
                 
@@ -262,27 +275,20 @@ def search_sidestone(keyword):
                 parent = div.parent
                 img_tag = parent.find('img')
                 img_src = img_tag['src'] if img_tag else None
-                if img_src and not img_src.startswith("http"):
-                    img_src = base_url + img_src
+                if img_src and not img_src.startswith("http"): img_src = base_url + img_src
                 
                 desc_tag = div.find('p')
                 desc = desc_tag.get_text(strip=True) if desc_tag else ""
                 
                 books.append({
-                    "title": title,
-                    "author": author,
-                    "link": link,
-                    "image": img_src,
-                    "desc": desc
+                    "title": title, "author": author, "link": link,
+                    "image": img_src, "desc": desc
                 })
             except: continue
         return books
     except: return []
 
 def get_sidestone_details(book_url):
-    """
-    Sidestone kitap sayfasından PDF veya Bookviewer linklerini çeker.
-    """
     try:
         r = requests.get(book_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
         soup = BeautifulSoup(r.text, 'html.parser')
@@ -291,25 +297,58 @@ def get_sidestone_details(book_url):
             "pdf_link": None,
             "read_link": None,
             "title_tr": None,
-            "desc_tr": None
+            "desc_tr": None,
+            "abstract_tr": None,
+            "abstract_orig": None,
+            "contents_tr": None,
+            "contents_orig": None
         }
         
+        # Linkleri Bul
         all_links = soup.find_all('a', href=True)
         for link in all_links:
             href = link['href']
             text = link.get_text().lower()
-            
-            # Tam URL'ye çevir
             full_href = href if href.startswith("http") else "https://www.sidestone.com" + href
             
-            # PDF Linki: Genelde .pdf içerir veya indirme butonudur
             if (".pdf" in href and "download" in href) or "ebook (pdf)" in text:
-                # Ücretli mi ücretsiz mi ayırt etmek zor olabilir ama genelde download linki varsa denenir
                 data["pdf_link"] = full_href
-            
-            # Online Okuma Linki: bookviewer veya 'read online' metni
             if "bookviewer" in href or "read online" in text or "read in browser" in text:
                 data["read_link"] = full_href
+
+        # 1. ABSTRACT (ÖZET) ÇEKME
+        # ID="abstract" varsa oradan, yoksa başlıklardan ara
+        abstract_text = None
+        abs_div = soup.find(id='abstract')
+        if abs_div:
+            abstract_text = abs_div.get_text("\n", strip=True)
+        else:
+            # Yedek plan: Header tarama
+            for h in soup.find_all(['h2', 'h3']):
+                if "abstract" in h.get_text().lower():
+                    # Sonraki elemanları topla
+                    content = []
+                    curr = h.find_next_sibling()
+                    while curr and curr.name not in ['h2', 'h3', 'div', 'section']:
+                        if curr.name == 'p': content.append(curr.get_text(strip=True))
+                        curr = curr.find_next_sibling()
+                    if content: abstract_text = "\n\n".join(content)
+                    break
+        
+        if abstract_text:
+            data["abstract_orig"] = abstract_text
+            data["abstract_tr"] = translate_to_turkish(abstract_text)
+
+        # 2. CONTENTS (İÇİNDEKİLER) ÇEKME
+        # ID="contents" varsa oradan
+        contents_text = None
+        cont_div = soup.find(id='contents')
+        if cont_div:
+            contents_text = cont_div.get_text("\n", strip=True)
+        
+        if contents_text:
+            data["contents_orig"] = contents_text
+            data["contents_tr"] = translate_to_turkish(contents_text)
 
         return data
     except: return None
@@ -462,7 +501,6 @@ with tab4:
                 unique_ss_key = f"ss_{i}"
                 
                 with c1:
-                    # Başlık Çevirisi
                     if unique_ss_key in st.session_state.ss_cache:
                         cached = st.session_state.ss_cache[unique_ss_key]
                         st.subheader(cached['title_tr'])
@@ -474,40 +512,48 @@ with tab4:
                     if book['image']: st.image(book['image'], width=100)
                 
                 with c2:
-                    # Detaylar ve Linkler
                     if unique_ss_key in st.session_state.ss_cache:
                         details = st.session_state.ss_cache[unique_ss_key]
                         
-                        # PDF Varsa PDF Ver
+                        # PDF ve Okuma Butonları
                         if details['pdf_link']:
                             st.link_button("📥 PDF İndir (Direkt)", details['pdf_link'], type="primary")
-                        
-                        # Yoksa veya Sadece Online Varsa Onu Ver
                         if details['read_link']:
-                            st.link_button("📖 Tarayıcıda Oku (Ücretsiz)", details['read_link'])
+                            st.link_button("📖 Tarayıcıda Oku", details['read_link'])
+                            if st.button("📄 Sayfayı PDF Yap (Dönüştür)", key=f"ss_pdf_gen_{unique_ss_key}"):
+                                with st.spinner("Sayfa PDF'e çevriliyor..."):
+                                    pdf_bytes = convert_html_to_pdf_selenium(details['read_link'])
+                                    if pdf_bytes:
+                                        clean_name = re.sub(r'[\\/*?:"<>|]', "", book['title'])[:30] + "_Converted.pdf"
+                                        st.download_button("💾 PDF KAYDET", pdf_bytes, clean_name, "application/pdf", key=f"dl_ss_pdf_{unique_ss_key}", type="primary")
                         
                         if not details['pdf_link'] and not details['read_link']:
                             st.warning("Ücretsiz erişim bulunamadı.")
                             st.link_button("Siteye Git", book['link'])
 
-                        st.markdown("### 📝 Özet (TR)")
-                        st.write(details['desc_tr'])
+                        # ÖZET (Abstract)
+                        if details['abstract_tr']:
+                            st.markdown("### 📝 Geniş Özet (Abstract)")
+                            st.write(details['abstract_tr'])
+                            with st.expander("🇬🇧 Orijinal Özeti Gör"):
+                                st.write(details['abstract_orig'])
                         
-                        with st.expander("Orijinal Özeti Gör"):
-                            st.write(book['desc'])
+                        # İÇİNDEKİLER (Contents)
+                        if details['contents_tr']:
+                            with st.expander("📑 İçindekiler (TOC)"):
+                                st.text(details['contents_tr'])
+                                st.divider()
+                                st.caption("Orijinal Liste:")
+                                st.text(details['contents_orig'])
                             
                     else:
-                        if st.button("🔍 İndirme & Çeviri", key=f"ss_meta_{unique_ss_key}"):
-                            with st.spinner("PDF linkleri aranıyor ve çevriliyor..."):
+                        if st.button("🔍 İndirme, Özet & TOC", key=f"ss_meta_{unique_ss_key}"):
+                            with st.spinner("Veriler çekiliyor ve çevriliyor..."):
                                 details = get_sidestone_details(book['link'])
                                 if details:
-                                    # Başlığı ve özeti çevirip kaydet
                                     details['title_tr'] = translate_to_turkish(book['title'])
-                                    details['desc_tr'] = translate_to_turkish(book['desc'])
                                     st.session_state.ss_cache[unique_ss_key] = details
                                     st.rerun()
-                                else:
-                                    st.error("Bağlantı hatası.")
+                                else: st.error("Bağlantı hatası.")
                 st.divider()
-    elif ss_btn:
-        st.error("😔 Kaynak Bulunamadı.")
+    elif ss_btn: st.error("😔 Kaynak Bulunamadı.")
