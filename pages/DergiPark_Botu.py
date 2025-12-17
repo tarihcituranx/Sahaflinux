@@ -10,7 +10,14 @@ import re
 import base64
 import time
 
-# Selenium (PDF Dönüştürme İçin Şart)
+# ÇEVİRİ KÜTÜPHANESİ (Yeni)
+try:
+    from deep_translator import GoogleTranslator
+except ImportError:
+    st.error("⚠️ deep-translator eksik! Lütfen requirements.txt dosyasına ekleyin.")
+    st.stop()
+
+# SELENIUM (PDF Dönüştürme İçin)
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
@@ -30,7 +37,7 @@ with st.sidebar:
     st.title("⚙️ Kontrol Paneli")
     st.success("✅ HTU: Aktif")
     st.success("✅ DergiPark: Aktif")
-    st.success("✅ Gutenberg: Künye & Özet Aktif")
+    st.success("✅ Gutenberg: Çeviri Modu Aktif")
     st.markdown("---")
 
 # --- URL DÜZELTİCİ ---
@@ -132,12 +139,26 @@ def get_real_pdf_link(article_url):
     return None
 
 # ========================================================
-# 3. PROJECT GUTENBERG (METADATA + PDF)
+# 3. PROJECT GUTENBERG (ÇEVİRİ + PDF)
 # ========================================================
+
+def translate_to_turkish(text):
+    """
+    İngilizce metni Türkçeye çevirir.
+    (LibreTranslate mantığında çalışır ancak daha kararlı olan Deep Translator kullanılır)
+    """
+    if not text or len(text) < 5:
+        return "Özet bulunamadı."
+    try:
+        # Google Translate altyapısını kullanır (Hızlı ve Ücretsiz)
+        translated = GoogleTranslator(source='auto', target='tr').translate(text)
+        return translated
+    except Exception as e:
+        return f"Çeviri yapılamadı. ({str(e)})"
 
 def get_gutenberg_metadata(book_url):
     """
-    Kitap detay sayfasına gidip hem indirme linklerini hem de KÜNYE bilgilerini çeker.
+    Kitap detaylarını çeker, özeti bulur ve ÇEVİRİSİNİ yapar.
     """
     try:
         r = requests.get(book_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=15)
@@ -149,10 +170,11 @@ def get_gutenberg_metadata(book_url):
             "cover": None,
             "language": "Bilinmiyor",
             "category": "Belirtilmemiş",
-            "summary": "Özet bulunamadı."
+            "summary": None,
+            "summary_tr": None # Türkçe çeviri için
         }
         
-        # --- 1. İNDİRME LİNKLERİ ---
+        # --- LİNKLER ---
         html_tag = soup.find('a', class_='read_html')
         if html_tag: data["html_link"] = "https://www.gutenberg.org" + html_tag['href']
             
@@ -162,28 +184,28 @@ def get_gutenberg_metadata(book_url):
         cover_tag = soup.find('img', class_='cover-art')
         if cover_tag: data["cover"] = cover_tag['src']
         
-        # --- 2. KÜNYE BİLGİLERİ (Tablodan Çekme) ---
-        # Dil (Language)
+        # --- KÜNYE ---
         lang_row = soup.find('tr', {'itemprop': 'inLanguage'})
-        if lang_row:
-            data["language"] = lang_row.find('td').get_text(strip=True)
+        if lang_row: data["language"] = lang_row.find('td').get_text(strip=True)
             
-        # Kategori (LoC Class)
-        cat_row = soup.find('tr', {'property': 'dcterms:subject'}) # Bazen class row değişebilir
-        # Alternatif olarak LoC Class satırını bulalım
         for tr in soup.find_all('tr'):
             th = tr.find('th')
             if th and "LoC Class" in th.get_text():
                 data["category"] = tr.find('td').get_text(strip=True)
                 break
         
-        # --- 3. KİTAP ÖZETİ (Summary) ---
+        # --- ÖZET VE ÇEVİRİ ---
         summary_div = soup.find('div', class_='summary-text-container')
         if summary_div:
-            # "Read More" gibi buton yazılarını temizleyelim
             full_text = summary_div.get_text(" ", strip=True)
-            # Genelde özet temiz gelir ama bazen (This is an automatically generated summary) yazar.
-            data["summary"] = full_text.replace("Read More", "").replace("Show Less", "").strip()
+            original_summary = full_text.replace("Read More", "").replace("Show Less", "").strip()
+            
+            data["summary"] = original_summary
+            # Otomatik Çeviri Yap
+            data["summary_tr"] = translate_to_turkish(original_summary)
+        else:
+            data["summary"] = "Bu kitap için özet bulunmuyor."
+            data["summary_tr"] = "Özet bulunamadı."
 
         return data
     except Exception as e:
@@ -191,11 +213,8 @@ def get_gutenberg_metadata(book_url):
         return None
 
 def convert_html_to_pdf_selenium(html_url):
-    """
-    Selenium kullanarak Gutenberg HTML sayfasını PDF olarak yazdırır.
-    """
     status_box = st.empty()
-    status_box.info("🚀 Chrome motoru başlatılıyor...")
+    status_box.info("🚀 PDF Hazırlanıyor...")
     
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -215,15 +234,12 @@ def convert_html_to_pdf_selenium(html_url):
             
         driver = webdriver.Chrome(service=service, options=chrome_options)
         
-        status_box.info("📄 Sayfa işleniyor...")
         driver.get(html_url)
         time.sleep(2)
         
-        status_box.info("🖨️ PDF basılıyor...")
         pdf_data = driver.execute_cdp_cmd("Page.printToPDF", {
             "printBackground": True,
-            "paperWidth": 8.27,
-            "paperHeight": 11.69,
+            "paperWidth": 8.27, "paperHeight": 11.69,
             "marginTop": 0.4, "marginBottom": 0.4, "marginLeft": 0.4, "marginRight": 0.4
         })
         
@@ -231,7 +247,7 @@ def convert_html_to_pdf_selenium(html_url):
         return base64.b64decode(pdf_data['data'])
 
     except Exception as e:
-        status_box.error(f"Dönüştürme Hatası: {e}")
+        status_box.error(f"Hata: {e}")
         return None
     finally:
         if driver: driver.quit()
@@ -256,7 +272,6 @@ def search_gutenberg(keyword):
                 author_tag = item.find('span', class_='subtitle')
                 author = author_tag.get_text(strip=True) if author_tag else "Bilinmiyor"
                 
-                # Kapak resmi (Arama sonucunda varsa alalım, yoksa detayda alırız)
                 img_tag = item.find('img', class_='cover-thumb')
                 img_src = base_url + img_tag['src'] if img_tag else None
 
@@ -335,7 +350,7 @@ with tab2:
                                     st.rerun()
                 with col_b: st.markdown(f"👉 **[Makale Sayfasına Git]({makale['link']})**")
 
-# --- SEKME 3: GUTENBERG (DETAYLI KÜNYE) ---
+# --- SEKME 3: GUTENBERG (ÇEVİRİLİ) ---
 with tab3:
     st.header("📚 Project Gutenberg (E-Kitap)")
     
@@ -369,10 +384,10 @@ with tab3:
                     if unique_gb_key in st.session_state.gb_cache:
                         details = st.session_state.gb_cache[unique_gb_key]
                         
-                        # --- KÜNYE BİLGİLERİ ---
+                        # Künye
                         st.info(f"🗣️ **Dil:** {details['language']}\n\n📂 **Kategori:** {details['category']}")
                         
-                        # --- İNDİRME BUTONLARI ---
+                        # İndirme Butonları
                         if details['epub_link']:
                             st.link_button("📱 EPUB İndir", details['epub_link'])
                         if details['html_link']:
@@ -380,15 +395,19 @@ with tab3:
                                 pdf_bytes = convert_html_to_pdf_selenium(details['html_link'])
                                 if pdf_bytes:
                                     clean_name = re.sub(r'[\\/*?:"<>|]', "", book['title'])[:30] + ".pdf"
-                                    st.download_button("💾 PDF OLARAK KAYDET", pdf_bytes, clean_name, "application/pdf", key=f"dl_pdf_{unique_gb_key}", type="primary")
+                                    st.download_button("💾 PDF KAYDET", pdf_bytes, clean_name, "application/pdf", key=f"dl_pdf_{unique_gb_key}", type="primary")
                         
-                        # --- ÖZET ALANI ---
-                        with st.expander("📖 Kitap Özeti / Hakkında"):
+                        # --- ÖZET ALANI (ÇEVİRİ) ---
+                        st.markdown("### 📖 Kitap Özeti (Türkçe)")
+                        st.write(details['summary_tr'])
+                        
+                        # Orijinali Gör Seçeneği
+                        with st.expander("📝 Orijinal Özeti Gör (İngilizce)"):
                             st.write(details['summary'])
                     
                     else:
                         if st.button("🔍 Detay & İndirme", key=f"meta_{unique_gb_key}"):
-                            with st.spinner("Künye ve linkler çekiliyor..."):
+                            with st.spinner("Özet çevriliyor ve linkler alınıyor..."):
                                 meta = get_gutenberg_metadata(book['link'])
                                 if meta:
                                     st.session_state.gb_cache[unique_gb_key] = meta
