@@ -193,127 +193,160 @@ def pdf_icerigi_cek(pdf_url):
     except Exception:
         return ""
 
-# Anlamlı olmayan, jenerik link metinleri (bunlardan dosya adı çıkarılmaz)
-GORSUZ_LINK_METINLERI = {
+# Sayfa gezintisi olan linkler — bunlar dosya değil
+SAYFA_LINKLERI = re.compile(
+    r"DuyuruDetay|PersonelAlim|Kurumsal|Saraylar|Muzeler|Ziyaret"
+    r"|javascript:|#|mailto:|tel:",
+    re.I
+)
+
+# Jenerik buton metinleri — dosya adı olarak kullanılmaz
+JENERIK_METINLER = {
     "dosyayi gorun", "goruntule", "goster", "indir", "tikla",
     "tiklayin", "tiklayniz", "icin tiklayin", "buraya tiklayin",
-    "download", "open", "view", "dosya", "pdf", "click here"
+    "download", "open", "view", "click here", "dosyayi indir"
 }
+
+
+def dosya_linki_mi(href, base_url):
+    """
+    Linkin bir dosya indirme linki olup olmadığını kontrol eder.
+    Milli Saraylar sitesi çeşitli URL yapıları kullanabilir.
+    """
+    hl = href.lower()
+    tam = urljoin(base_url, href).lower()
+
+    # Kesinlikle dosya olan uzantılar
+    for ext in (".pdf", ".doc", ".docx", ".xls", ".xlsx", ".zip"):
+        if hl.endswith(ext) or (ext in hl and "?" in hl):
+            return True
+
+    # Site içi dosya sunucusu kalıpları
+    kaliplar = [
+        "getfile", "dosyagetir", "filedownload", "download",
+        "dosyaindir", "getdoc", "belgeal", "document",
+        "/dosya/", "/files/", "/upload", "/icerik/",
+    ]
+    for k in kaliplar:
+        if k in hl:
+            return True
+
+    # millisaraylar.gov.tr alanındaki ve sayfa olmayan linkler
+    if "millisaraylar" in tam and not SAYFA_LINKLERI.search(href):
+        # Uzun ID'li veya dosya yolu gibi görünen linkler
+        if re.search(r"[?&](id|dosyaid|file|f)=\d+", hl):
+            return True
+        if re.search(r"/\d{4,}/", hl):  # /2025/123456/ gibi
+            return True
+
+    return False
+
 
 def pdf_ad_bul(a_tag, href):
     """
-    PDF dosyası için anlamlı bir ad bulmaya çalışır.
-    Öncelik sırası:
-      1. Linkin kendi metni (jenerik değilse)
-      2. Link öncesindeki kardeş/ebeveyn elementlerin metni (.pdf içeriyorsa)
-      3. URL'den dosya adı
+    Dosya için anlamlı bir isim bulmaya çalışır.
+    Öncelik: yakın kardeş/ebeveyn metin → URL → "Belge"
     """
     from urllib.parse import unquote
 
+    # 1. Linkin kendi metni anlamlıysa kullan
     link_metni = a_tag.get_text(strip=True)
     norm_link  = normalize(link_metni)
-
-    # Anlamlı link metni → direkt kullan
-    if (link_metni
-            and len(link_metni) > 4
-            and not any(j in norm_link for j in GORSUZ_LINK_METINLERI)):
+    if (link_metni and len(link_metni) > 4
+            and not any(j in norm_link for j in JENERIK_METINLER)):
         return link_metni
 
-    # Yakın çevrede .pdf içeren metin ara (genellikle dosya adı linkin üstündedir)
-    for onceki in [a_tag.find_previous_sibling(), a_tag.parent,
-                   a_tag.parent.find_previous_sibling() if a_tag.parent else None]:
-        if onceki is None:
-            continue
-        try:
-            metin = onceki.get_text(strip=True)
-            if metin and ".pdf" in metin.lower() and len(metin) < 120:
-                return metin
-        except Exception:
-            pass
+    # 2. Üst kartta dosya adı yazıyor mu? (.pdf içeren yakın metin)
+    #    Milli Saraylar'da kart yapısı: dosya adı üstte, buton altta
+    aday_elementler = []
+    try:
+        # Aynı kart/hücre içindeki önceki elemanlar
+        kapsayici = a_tag.parent
+        for _ in range(5):
+            if kapsayici is None: break
+            aday_elementler.append(kapsayici)
+            kapsayici = kapsayici.parent
 
-    # Fallback: URL'den dosya adı
+        for el in aday_elementler:
+            metin = el.get_text(" ", strip=True)
+            # .pdf geçen kısa metin bul
+            eslesme = re.search(r"([^\n]{3,80}[.]pdf)", metin, re.I)
+            if eslesme:
+                ad = eslesme.group(1).strip()
+                if len(ad) < 100:
+                    return ad
+    except Exception:
+        pass
+
+    # 3. URL'den dosya adı
     dosya = href.split("/")[-1].split("?")[0]
     try:
         dosya = unquote(dosya)
     except Exception:
         pass
-    return dosya or "Belge"
+    if dosya and len(dosya) > 2:
+        return dosya
+
+    return "Belge"
 
 
 def ilan_icerik_cek(url):
     """
-    İlan sayfasından ham metin ve PDF linklerini çeker.
-    - Sadece ana içerik alanındaki PDF'leri alır (nav/footer/sidebar hariç)
-    - PDF adını linkin metninden değil, dosya adından veya yakın başlıktan alır
-    Döner: (metin: str, pdf_listesi: list[dict])
-      pdf_listesi elemanları: {"ad": str, "url": str, "icerik": str}
+    İlan sayfasından metin + dosya linklerini çeker.
+    Döner: (metin: str, pdf_listesi: list[dict], tum_linkler: list[dict])
+      - pdf_listesi: tespit edilen dosya linkleri
+      - tum_linkler: DEBUG için sayfadaki tüm linkler
     """
     try:
         resp = requests.get(url, headers=HEADERS, verify=False, timeout=20)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # ── Ana içerik alanını bul ──
-        # nav / header / footer içindeki PDF'leri istemiyoruz
-        icerik_alani = (
-            soup.find("main")
-            or soup.find("article")
-            or soup.find(id=re.compile(r"content|icerik|detay|main", re.I))
-            or soup.find(class_=re.compile(r"content|icerik|detay|main", re.I))
-            or soup  # hiçbiri yoksa tüm sayfa
-        )
+        # Tüm linkleri DEBUG için kaydet
+        tum_linkler = []
+        for a in soup.find_all("a", href=True):
+            metin = a.get_text(strip=True)
+            href  = a["href"]
+            if href and href not in ("#", "javascript:void(0)"):
+                tum_linkler.append({
+                    "metin": metin[:60],
+                    "href" : href[:120],
+                    "tam"  : urljoin(url, href)[:150],
+                })
 
-        # ── PDF linklerini topla ──
+        # Nav/footer/header'ı temizle — sadece içerik kalsın
+        for tag in soup(["nav", "header", "footer", "script", "style"]):
+            tag.decompose()
+
+        # PDF / dosya linklerini topla
         pdf_listesi = []
-        gorulen_pdf = set()
+        gorulen     = set()
 
-        for a in icerik_alani.find_all("a", href=True):
+        for a in soup.find_all("a", href=True):
             href = a["href"]
-
-            # .pdf uzantılı veya site içi GetFile/dosya yolları
-            href_lower = href.lower()
-            if not (href_lower.endswith(".pdf")
-                    or "getfile" in href_lower
-                    or ("dosya" in href_lower and "millisaraylar" in urljoin(url, href))):
+            if not href or href.startswith(("javascript:", "mailto:", "tel:")):
                 continue
 
-            # Nav / header / footer içindeyse atla
-            icerik_disi = False
-            ata = a.parent
-            for _ in range(10):
-                if ata is None:
-                    break
-                tag_adi = getattr(ata, "name", "") or ""
-                cls_id  = " ".join(ata.get("class", [])) + " " + (ata.get("id") or "")
-                if tag_adi in ("nav", "header", "footer"):
-                    icerik_disi = True
-                    break
-                if re.search(r"\bnav\b|sidebar|footer|header|menu", cls_id, re.I):
-                    icerik_disi = True
-                    break
-                ata = ata.parent
-            if icerik_disi:
+            if not dosya_linki_mi(href, url):
                 continue
 
             tam_url = urljoin(url, href)
-            if tam_url in gorulen_pdf:
+            if tam_url in gorulen:
                 continue
-            gorulen_pdf.add(tam_url)
+            gorulen.add(tam_url)
 
             ad     = pdf_ad_bul(a, href)
             icerik = pdf_icerigi_cek(tam_url)
             pdf_listesi.append({"ad": ad, "url": tam_url, "icerik": icerik})
 
-        # ── Sayfa ham metni ──
-        for tag in soup(["script", "style", "nav", "header", "footer"]):
-            tag.decompose()
+        # Sayfa metni
         satirlar = [s for s in soup.get_text("\n", strip=True).splitlines() if s.strip()]
-        metin = "\n".join(satirlar[:400])
+        metin    = "\n".join(satirlar[:400])
 
-        return metin, pdf_listesi
+        return metin, pdf_listesi, tum_linkler
 
     except Exception as e:
-        return f"İçerik alınamadı: {e}", []
+        return f"İçerik alınamadı: {e}", [], []
 
 # ─────────────────────────────────────────────
 # GROQ AI
@@ -484,8 +517,9 @@ def ilan_karti_goster(d, idx):
         pdf_anahtar   = f"pdfler_{idx}"
         if st.button("🤖 Detay Getir (AI Özet)", key=f"btn_{idx}", use_container_width=True):
             with st.spinner("📖 Sayfa okunuyor, PDF'ler kontrol ediliyor..."):
-                icerik, pdf_listesi = ilan_icerik_cek(d["link"])
-                st.session_state[pdf_anahtar] = pdf_listesi
+                icerik, pdf_listesi, tum_linkler = ilan_icerik_cek(d["link"])
+                st.session_state[pdf_anahtar]   = pdf_listesi
+                st.session_state[f"linkler_{idx}"] = tum_linkler
 
             with st.spinner("🤖 AI ile özetleniyor..."):
                 ozet = groq_ozet(d["baslik"], icerik, pdf_listesi)
@@ -509,21 +543,28 @@ def ilan_karti_goster(d, idx):
                 col_ad, col_btn = st.columns([4, 1])
                 with col_ad:
                     st.markdown(
-                        f"<div style='padding:6px 0; font-size:14px;'>📄 {pdf['ad']}</div>",
+                        f"<div style='padding:6px 0;font-size:14px;'>📄 {pdf['ad']}</div>",
                         unsafe_allow_html=True,
                     )
                 with col_btn:
-                    st.link_button(
-                        "⬇️ İndir",
-                        url=pdf["url"],
-                        use_container_width=True,
-                    )
-            st.markdown("")  # boşluk
+                    st.link_button("⬇️ İndir", url=pdf["url"], use_container_width=True)
+            st.markdown("")
+        else:
+            # Dosya bulunamadıysa debug expander göster
+            tum_linkler = st.session_state.get(f"linkler_{idx}", [])
+            if tum_linkler:
+                with st.expander("🔍 Sayfada Bulunan Linkler (PDF tespit edilemedi — debug)", expanded=False):
+                    st.caption("Bu linklerden hangisinin PDF/dosya olduğunu anlayabilmek için gösteriliyor.")
+                    for lnk in tum_linkler:
+                        st.markdown(
+                            f"**Metin:** `{lnk['metin']}` | **href:** `{lnk['href']}`",
+                        )
 
         if st.button("✖️ Kapat", key=f"kapat_{idx}"):
             del st.session_state[anahtar]
-            if pdf_anahtar in st.session_state:
-                del st.session_state[pdf_anahtar]
+            for k in [pdf_anahtar, f"linkler_{idx}"]:
+                if k in st.session_state:
+                    del st.session_state[k]
             st.rerun()
 
     st.divider()
