@@ -50,12 +50,62 @@ HTTP_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
+        "Chrome/123.0.0.0 Safari/537.36"
     ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "tr-TR,tr;q=0.9",
-    "Connection": "keep-alive",
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;"
+        "q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+    ),
+    "Accept-Language"   : "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding"   : "gzip, deflate, br",
+    "Connection"        : "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest"    : "document",
+    "Sec-Fetch-Mode"    : "navigate",
+    "Sec-Fetch-Site"    : "none",
+    "Sec-Fetch-User"    : "?1",
+    "Cache-Control"     : "max-age=0",
 }
+
+def http_get(url: str, max_deneme: int = 3) -> requests.Response:
+    """
+    403/429'a karşı retry + session cookie destekli GET.
+    Önce session aç, çerezleri al, sonra asıl isteği at.
+    """
+    session = requests.Session()
+    session.headers.update(HTTP_HEADERS)
+
+    for deneme in range(max_deneme):
+        try:
+            # İlk denemede ana sayfaya gidip çerez al
+            if deneme == 0 and url != ANASAYFA_URL:
+                try:
+                    session.get(ANASAYFA_URL, verify=False, timeout=10)
+                except Exception:
+                    pass
+
+            r = session.get(url, verify=False, timeout=20)
+
+            if r.status_code == 403:
+                time.sleep(2 * (deneme + 1))
+                continue
+            if r.status_code == 429:
+                time.sleep(5 * (deneme + 1))
+                continue
+
+            r.raise_for_status()
+            return r
+
+        except requests.exceptions.HTTPError:
+            if deneme == max_deneme - 1:
+                raise
+            time.sleep(2)
+        except Exception:
+            if deneme == max_deneme - 1:
+                raise
+            time.sleep(2)
+
+    raise requests.exceptions.ConnectionError(f"Bağlantı kurulamadı: {url}")
 
 MESLEK_KATEGORILERI = {
     "👷 Teknik / Mühendis": [
@@ -271,8 +321,7 @@ def pdf_bytes_oku(pdf_bytes: bytes, max_char: int = 5000) -> str:
 def pdf_url_indir(url: str) -> bytes:
     """URL'den PDF bytes indirir."""
     try:
-        r = requests.get(url, headers=HTTP_HEADERS, verify=False, timeout=20)
-        r.raise_for_status()
+        r  = http_get(url)
         ct = r.headers.get("Content-Type","")
         if "pdf" in ct.lower() or url.lower().endswith(".pdf"):
             return r.content
@@ -294,8 +343,7 @@ def ilan_detay_isle(ilan: dict) -> tuple[str, list[dict]]:
     kod = ilan["kod"]
 
     try:
-        r  = requests.get(url, headers=HTTP_HEADERS, verify=False, timeout=20)
-        r.raise_for_status()
+        r  = http_get(url)
         ct = r.headers.get("Content-Type","")
 
         # Doğrudan PDF
@@ -369,8 +417,7 @@ def ilan_detay_isle(ilan: dict) -> tuple[str, list[dict]]:
 def site_ilanlarini_cek() -> list[dict]:
     """Ana sayfadaki ilan listesini çeker (hafif istek)."""
     try:
-        r = requests.get(ANASAYFA_URL, headers=HTTP_HEADERS, verify=False, timeout=20)
-        r.raise_for_status()
+        r = http_get(ANASAYFA_URL)
     except Exception as e:
         st.error(f"Site çekilemedi: {e}")
         return []
