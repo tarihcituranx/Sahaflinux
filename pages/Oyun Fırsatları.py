@@ -233,7 +233,7 @@ def kur_getir_tcmb() -> float:
         r = requests.get(url, timeout=10)
         r.raise_for_status()
         
-        # XML verisini ayrıştırıyoruz (JSON olmadığı için ElementTree kullanıyoruz)
+        # XML verisini ayrıştırıyoruz
         root = ET.fromstring(r.content)
         for currency in root.findall('Currency'):
             if currency.get('CurrencyCode') == 'USD':
@@ -324,7 +324,6 @@ def groq_cevir(metin: str, baslik: str = "") -> str:
 # YARDIMCI FONKSİYONLAR
 # ─────────────────────────────────────────────
 def worth_to_float(worth) -> float:
-    """'$5.99' gibi değerleri güvenli float'a çevirir"""
     if not worth or str(worth).lower() in ("n/a", "0.0", "0", ""):
         return 0.0
     clean = str(worth).replace('$', '').replace(',', '').strip()
@@ -366,13 +365,13 @@ def ilan_karti_goster(ilan: dict, idx: int, guncel_kur: float):
     if tur:
         etiket_html += f'<span class="gp-etiket gp-etiket-tur">{tur_etiket(tur)}</span>'
 
-    # Fiyat HTML'ini Dolar ve TL olacak şekilde ayarla
+    # Fiyat HTML'i simge olmadan USD ve TRY formatında
     if deger_usd_fl > 0:
         deger_tl = deger_usd_fl * guncel_kur
-        tl_gosterimi = f'<div class="gp-deger-try">~{deger_tl:.2f} ₺</div>' if guncel_kur > 0 else ""
+        tl_gosterimi = f'<div class="gp-deger-try">~{deger_tl:.2f} TRY</div>' if guncel_kur > 0 else ""
         deger_html = f"""
         <div class="gp-deger-kapsayici">
-            <div class="gp-deger">${deger_usd_fl:.2f}</div>
+            <div class="gp-deger">{deger_usd_fl:.2f} USD</div>
             {tl_gosterimi}
         </div>
         """
@@ -453,11 +452,11 @@ def worth_goster(guncel_kur: float):
     tl_gosterimi = ""
     if guncel_kur > 0 and toplam_deger_usd > 0:
         toplam_deger_tl = toplam_deger_usd * guncel_kur
-        tl_gosterimi = f'<div class="worth-sayi-try">~{toplam_deger_tl:,.0f} ₺</div>'
+        tl_gosterimi = f'<div class="worth-sayi-try">~{toplam_deger_tl:,.0f} TRY</div>'
 
     st.markdown(f"""
     <div class="worth-kutu">
-        <div class="worth-sayi">${toplam_deger_usd:,.2f}</div>
+        <div class="worth-sayi">{toplam_deger_usd:,.2f} USD</div>
         {tl_gosterimi}
         <div class="worth-alt">
             Şu an aktif <b>{aktif_sayi}</b> ücretsiz fırsatın toplam tahmini değeri
@@ -480,7 +479,7 @@ def sidebar_filtre(guncel_kur: float) -> dict:
     """, unsafe_allow_html=True)
 
     if guncel_kur > 0:
-        st.sidebar.info(f"💵 Güncel Kur: **{guncel_kur:.2f} ₺**")
+        st.sidebar.info(f"💵 Güncel Kur: **{guncel_kur:.2f} TRY**")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("🕹️ Platform")
@@ -569,7 +568,7 @@ def main():
     col1.metric("🎮 Toplam Fırsat", len(ilanlar))
     
     toplam_usd = sum(worth_to_float(d.get('worth')) for d in ilanlar)
-    col2.metric("💰 Toplam Değer", f"${toplam_usd:,.0f}")
+    col2.metric("💰 Toplam Değer", f"{toplam_usd:,.0f} USD")
     
     col3.metric("⭐ Favoriler", len(st.session_state.get("gp_favoriler", set())))
 
