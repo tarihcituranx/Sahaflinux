@@ -74,38 +74,43 @@ def http_get(url: str, max_deneme: int = 3) -> requests.Response:
     """
     import json as _json
 
-    api_ninjas_key = st.secrets.get("API_NINJAS_KEY", "")
+    try:
+        api_ninjas_key = st.secrets["API_NINJAS_KEY"]
+    except Exception:
+        api_ninjas_key = ""
     is_pdf = url.lower().endswith(".pdf") or "getfile" in url.lower()
 
     # API Ninjas ile dene (HTML sayfaları için)
     if api_ninjas_key and not is_pdf:
         for deneme in range(max_deneme):
             try:
-                r = requests.get(
+                ninja_r = requests.get(
                     "https://api.api-ninjas.com/v1/webscraper",
                     headers={"X-Api-Key": api_ninjas_key},
                     params={"url": url},
-                    timeout=30,
+                    timeout=45,
                 )
-                if r.status_code == 200:
+                if ninja_r.status_code == 200:
+                    html = ninja_r.text
                     class FakeResponse:
                         def __init__(self, raw: str):
-                            try:
-                                parsed   = _json.loads(raw)
-                                self.text = parsed.get("data", raw)
-                            except Exception:
-                                self.text = raw
-                            self.content     = self.text.encode("utf-8")
+                            self.text        = raw
+                            self.content     = raw.encode("utf-8", errors="replace")
                             self.status_code = 200
                             self._h          = {"Content-Type": "text/html; charset=utf-8"}
                         def raise_for_status(self): pass
                         @property
                         def headers(self): return self._h
-                    return FakeResponse(r.text)
-                if r.status_code == 429:
+                    return FakeResponse(html)
+                elif ninja_r.status_code == 429:
                     time.sleep(5 * (deneme + 1))
                     continue
-            except Exception:
+                else:
+                    # API Ninjas hatasını göster
+                    st.warning(f"API Ninjas {ninja_r.status_code}: {ninja_r.text[:200]}")
+                    break
+            except Exception as ninja_ex:
+                st.warning(f"API Ninjas bağlantı hatası: {ninja_ex}")
                 if deneme == max_deneme - 1:
                     break
                 time.sleep(2)
