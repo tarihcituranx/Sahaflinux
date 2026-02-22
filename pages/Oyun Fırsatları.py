@@ -33,13 +33,170 @@ SIRALAMA_SECENEKLERI = {
     "Popülerliğe göre": "popularity",
 }
 
-PLATFORM_ETIKET = { ... }  # (orijinal kodundaki aynı)
-TUR_ETIKET = { ... }       # (orijinal kodundaki aynı)
+PLATFORM_ETIKET = {
+    "pc"                  : "🖥️ PC",
+    "steam"               : "🟦 Steam",
+    "epic-games-store"    : "⚫ Epic",
+    "gog"                 : "🟣 GOG",
+    "itch.io"             : "🎮 Itch.io",
+    "ps4"                 : "🔵 PS4",
+    "ps5"                 : "🔵 PS5",
+    "xbox-one"            : "🟢 Xbox One",
+    "xbox-series-xs"      : "🟢 Xbox Series",
+    "switch"              : "🔴 Switch",
+    "android"             : "🤖 Android",
+    "ios"                 : "🍎 iOS",
+    "vr"                  : "👓 VR",
+    "battlenet"           : "🔷 Battle.net",
+    "ubisoft"             : "🟠 Ubisoft",
+    "origin"              : "🟠 Origin",
+    "drm-free"            : "🆓 DRM-Free",
+    "multiple-platforms"  : "🌐 Çoklu Platform",
+}
+
+TUR_ETIKET = {
+    "game": "🎮 Oyun",
+    "loot": "🎁 Loot",
+    "beta": "🧪 Beta",
+}
 
 # ─────────────────────────────────────────────
-# CSS (değişmedi)
+# CSS
 # ─────────────────────────────────────────────
-CSS = """ ... """   # (orijinal CSS tamamen aynı, buraya yapıştır)
+CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@300;400;500&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3 {
+    font-family: 'Rajdhani', sans-serif !important;
+    letter-spacing: 1px;
+}
+
+.gp-kart {
+    background: linear-gradient(135deg, #0f1923 0%, #162030 100%);
+    border: 1px solid #1e3a52;
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    transition: border-color 0.2s;
+}
+.gp-kart:hover { border-color: #00c2ff44; }
+
+.gp-kart-ust {
+    display: flex;
+    gap: 14px;
+    padding: 14px;
+}
+
+.gp-gorsel {
+    width: 110px;
+    min-width: 110px;
+    height: 65px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #0a0f16;
+}
+
+.gp-bilgi { flex: 1; min-width: 0; }
+
+.gp-baslik {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #e8f4ff;
+    line-height: 1.2;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gp-meta {
+    font-size: 12px;
+    color: #5a7a9a;
+    margin-bottom: 6px;
+}
+
+.gp-etiketler { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.gp-etiket {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: #0a1a2a;
+    border: 1px solid #1e3a52;
+    color: #7ab8d8;
+}
+
+.gp-etiket-tur {
+    background: #0d2010;
+    border-color: #1a4020;
+    color: #5dba70;
+}
+
+.gp-deger {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: #00c2ff;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.gp-deger-bos { color: #2a4a6a; font-size: 13px; }
+
+.gp-aciklama {
+    font-size: 13px;
+    color: #7a9ab8;
+    line-height: 1.6;
+    padding: 10px 14px;
+    border-top: 1px solid #1e3a52;
+    background: #0a1420;
+}
+
+.gp-bitis {
+    font-size: 11px;
+    color: #e05a5a;
+    margin-top: 4px;
+}
+
+.worth-kutu {
+    background: linear-gradient(135deg, #0a1f0a, #0d2a1a);
+    border: 1px solid #1a5030;
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.worth-sayi {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 38px;
+    font-weight: 700;
+    color: #00e676;
+    line-height: 1;
+}
+
+.worth-alt {
+    font-size: 13px;
+    color: #4a8a6a;
+    margin-top: 4px;
+}
+
+.ceviriliyor {
+    font-size: 12px;
+    color: #4a7a9a;
+    font-style: italic;
+    padding: 6px 14px 10px;
+    background: #0a1420;
+}
+</style>
+"""
 
 # ─────────────────────────────────────────────
 # GAMERPOWER API
@@ -71,12 +228,11 @@ def ilanlar_getir(platform: str, tur: str, siralama: str) -> list:
         params["type"] = tur
     if siralama:
         params["sort-by"] = siralama
-
     sonuc = gp_getir("giveaways", params)
     return sonuc if isinstance(sonuc, list) else []
 
 # ─────────────────────────────────────────────
-# GROQ — TÜRKÇE ÇEVİRİ (değişmedi)
+# GROQ — TÜRKÇE ÇEVİRİ
 # ─────────────────────────────────────────────
 def groq_cevir(metin: str, baslik: str = "") -> str:
     if not metin or not metin.strip():
@@ -91,12 +247,27 @@ def groq_cevir(metin: str, baslik: str = "") -> str:
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
         yanit = client.chat.completions.create(
             model=GROQ_MODEL,
-            messages=[ ... ],   # orijinal mesajlar aynı
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Sen bir oyun haberleri çevirmenisin. "
+                        "Verilen İngilizce metni sade, akıcı Türkçeye çevir. "
+                        "Oyun jargonunu koru (örn: loot, beta, DLC). "
+                        "Sadece çeviriyi döndür, açıklama ekleme."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Oyun adı: {baslik}\n\nAçıklama:\n{metin[:1500]}",
+                },
+            ],
             temperature=0.2,
             max_tokens=800,
         )
         st.session_state["son_groq_istegi"] = time.time()
         return yanit.choices[0].message.content.strip()
+
     except Exception as e:
         hata = str(e)
         if "rate_limit" in hata.lower():
@@ -136,12 +307,52 @@ def deger_formatla(deger: str) -> str:
         return deger
 
 # ─────────────────────────────────────────────
-# KART GÖSTER (sadece butonlar değişti)
+# KART GÖSTER
 # ─────────────────────────────────────────────
 def ilan_karti_goster(ilan: dict, idx: int):
-    # ... (üst kısım tamamen aynı)
+    baslik      = ilan.get("title","")
+    aciklama_en = ilan.get("description","")
+    platform    = ilan.get("platforms","")
+    tur         = ilan.get("type","")
+    deger       = deger_formatla(str(ilan.get("worth","0")))
+    gorsel      = ilan.get("image","")
+    link        = ilan.get("open_giveaway_url","") or ilan.get("open_giveaway","")
+    bitis       = bitis_formatla(ilan.get("end_date",""))
+    aciklama_key = f"aciklama_{idx}"
 
-    st.markdown(f""" ... """, unsafe_allow_html=True)  # kart HTML aynı
+    platformlar = [p.strip() for p in platform.split(",") if p.strip()]
+    etiket_html = "".join(
+        f'<span class="gp-etiket">{platform_etiket(p)}</span>'
+        for p in platformlar
+    )
+    if tur:
+        etiket_html += f'<span class="gp-etiket gp-etiket-tur">{tur_etiket(tur)}</span>'
+
+    deger_html = (
+        f'<div class="gp-deger">{deger}</div>'
+        if deger else
+        '<div class="gp-deger gp-deger-bos">Ücretsiz</div>'
+    )
+
+    gorsel_html = (
+        f'<img class="gp-gorsel" src="{gorsel}" alt="">'
+        if gorsel else
+        '<div class="gp-gorsel"></div>'
+    )
+
+    st.markdown(f"""
+    <div class="gp-kart">
+        <div class="gp-kart-ust">
+            {gorsel_html}
+            <div class="gp-bilgi">
+                <div class="gp-baslik" title="{baslik}">{baslik}</div>
+                <div class="gp-etiketler">{etiket_html}</div>
+                {f'<div class="gp-bitis">{bitis}</div>' if bitis else ""}
+            </div>
+            {deger_html}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([2, 2, 1])
 
@@ -162,7 +373,7 @@ def ilan_karti_goster(ilan: dict, idx: int):
 
     with col3:
         favs = st.session_state.setdefault("gp_favoriler", set())
-        ilan_id = str(ilan.get("id", ""))
+        ilan_id = str(ilan.get("id",""))
         fav_ikon = "⭐" if ilan_id in favs else "☆"
         if st.button(fav_ikon, key=f"fav_{idx}", width="stretch"):
             if ilan_id in favs:
@@ -172,27 +383,97 @@ def ilan_karti_goster(ilan: dict, idx: int):
             st.rerun()
 
     if aciklama_key in st.session_state:
-        st.markdown(f'<div class="gp-aciklama">{st.session_state[aciklama_key]}</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="gp-aciklama">{st.session_state[aciklama_key]}</div>',
+            unsafe_allow_html=True,
+        )
 
     st.divider()
 
 # ─────────────────────────────────────────────
-# WORTH KUTUSU (değişmedi)
+# WORTH KUTUSU
 # ─────────────────────────────────────────────
 def worth_goster():
-    # ... aynı
+    with st.spinner("📊 Anlık değer hesaplanıyor..."):
+        veri = worth_getir()
+
+    if not veri:
+        return
+
+    toplam_deger  = veri.get("worth_estimation_usd","?")
+    aktif_sayi    = veri.get("active_giveaways_number","?")
+
+    st.markdown(f"""
+    <div class="worth-kutu">
+        <div class="worth-sayi">${toplam_deger}</div>
+        <div class="worth-alt">
+            Şu an aktif <b>{aktif_sayi}</b> ücretsiz fırsatın toplam tahmini değeri
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
-# SIDEBAR (değişmedi)
+# SIDEBAR
 # ─────────────────────────────────────────────
 def sidebar_filtre() -> dict:
-    # ... aynı
+    st.sidebar.markdown("""
+    <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;
+         color:#00c2ff;letter-spacing:2px;margin-bottom:4px">
+    🎮 GAMERPOWER
+    </div>
+    <div style="font-size:12px;color:#4a7a9a;margin-bottom:16px">
+    Ücretsiz Oyun & Loot Takibi
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🕹️ Platform")
+    platform = st.sidebar.selectbox(
+        "Platform:", PLATFORM_SECENEKLERI, key="gp_platform"
+    )
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🎁 Tür")
+    tur = st.sidebar.radio(
+        "Tür:", TUR_SECENEKLERI, key="gp_tur"
+    )
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📊 Sıralama")
+    siralama_label = st.sidebar.radio(
+        "Sırala:", list(SIRALAMA_SECENEKLERI.keys()), key="gp_siralama"
+    )
+
+    st.sidebar.markdown("---")
+    sadece_favori = st.sidebar.checkbox(
+        f"⭐ Sadece Favoriler ({len(st.session_state.get('gp_favoriler', set()))})",
+        key="gp_favori",
+    )
+
+    st.sidebar.markdown("---")
+    st.sidebar.caption(
+        "📡 Kaynak: gamerpower.com\n\n"
+        "🤖 Çeviri: Groq llama-3.3-70b\n\n"
+        "⏱️ Cache: 5 dakika"
+    )
+
+    return {
+        "platform"     : platform,
+        "tur"          : tur,
+        "siralama"     : SIRALAMA_SECENEKLERI[siralama_label],
+        "sadece_favori": sadece_favori,
+    }
 
 # ─────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────
 def main():
-    st.set_page_config(page_title="GamerPower TR — Ücretsiz Oyunlar", page_icon="🎮", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(
+        page_title="GamerPower TR — Ücretsiz Oyunlar",
+        page_icon="🎮",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
     st.markdown(CSS, unsafe_allow_html=True)
 
     if "son_groq_istegi" not in st.session_state:
@@ -200,20 +481,31 @@ def main():
     if "gp_favoriler" not in st.session_state:
         st.session_state["gp_favoriler"] = set()
 
-    st.markdown(""" ... """, unsafe_allow_html=True)  # başlık aynı
+    st.markdown("""
+    <h1 style="font-family:'Rajdhani',sans-serif;font-size:36px;font-weight:700;
+         color:#e8f4ff;letter-spacing:2px;margin-bottom:4px">
+    🎮 ÜCRETSİZ OYUN & LOOT TAKİBİ
+    </h1>
+    <p style="color:#4a7a9a;font-size:14px;margin-top:0">
+    GamerPower — anlık fırsatlar, Groq ile Türkçe açıklamalar
+    </p>
+    """, unsafe_allow_html=True)
 
     worth_goster()
 
     filtre = sidebar_filtre()
 
     with st.spinner("🎮 İlanlar yükleniyor..."):
-        ilanlar = ilanlar_getir(filtre["platform"], filtre["tur"], filtre["siralama"])
+        ilanlar = ilanlar_getir(
+            filtre["platform"],
+            filtre["tur"],
+            filtre["siralama"],
+        )
 
     if filtre["sadece_favori"]:
         favs = st.session_state.get("gp_favoriler", set())
-        ilanlar = [d for d in ilanlar if str(d.get("id", "")) in favs]
+        ilanlar = [d for d in ilanlar if str(d.get("id","")) in favs]
 
-    # ── İstatistik (burası düzeltildi!)
     col1, col2, col3 = st.columns(3)
     col1.metric("🎮 Toplam Fırsat", len(ilanlar))
     col2.metric(
@@ -228,7 +520,6 @@ def main():
         st.info("Bu filtrelere uygun ilan bulunamadı.")
         return
 
-    # ── İlanları listele
     for i, ilan in enumerate(ilanlar):
         ilan_karti_goster(ilan, i)
 
