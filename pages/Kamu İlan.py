@@ -1,8 +1,10 @@
 import time
 import re
 import io
+import os
+import json
 from collections import defaultdict
-from urllib.parse import urljoin, quote
+from urllib.parse import urljoin, unquote
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -10,19 +12,6 @@ import urllib3
 import streamlit as st
 from bs4 import BeautifulSoup
 from groq import Groq
-
-# Bot koruması aşma katmanları
-try:
-    import cloudscraper
-    CLOUDSCRAPER_VAR = True
-except ImportError:
-    CLOUDSCRAPER_VAR = False
-
-try:
-    import curl_cffi.requests as curl_requests
-    CURL_CFFI_VAR = True
-except ImportError:
-    CURL_CFFI_VAR = False
 
 try:
     import PyPDF2
@@ -36,28 +25,52 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # AYARLAR
 # ─────────────────────────────────────────────
 ANASAYFA_URL      = "https://kamuilan.sbb.gov.tr/"
+BASE_URL          = "https://kamuilan.sbb.gov.tr/"
 GROQ_API_KEY      = st.secrets["GROQ_API_KEY"]
 GROQ_MODEL        = "llama-3.3-70b-versatile"
 RATE_LIMIT_SANIYE = 4
 TZ_TURKIYE        = timezone(timedelta(hours=3))
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
-              "image/avif,image/webp,image/apng,*/*;q=0.8",
-    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Accept-Encoding": "gzip, deflate, br",
-    "DNT": "1",
-    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "tr-TR,tr;q=0.9",
     "Connection": "keep-alive",
 }
 
-TURKCE_AYLAR = {
-    "ocak":1,"şubat":2,"mart":3,"nisan":4,"mayıs":5,
-    "haziran":6,"temmuz":7,"ağustos":8,"eylül":9,
-    "ekim":10,"kasım":11,"aralık":12,
-    "subat":2,"mayis":5,"agustos":8,"eylul":9,"kasim":11,"aralik":12,
+# Meslek/pozisyon kategorileri — arama ve filtreleme için
+MESLEK_KATEGORILERI = {
+    "👷 Teknik / Mühendis": [
+        "mühendis","muhendis","tekniker","teknisyen","teknik","mimar",
+        "bilişim","yazılım","elektrik","elektronik","makine","inşaat",
+        "harita","jeoloji","jeofizik","çevre","kimya","metalurji",
+    ],
+    "💼 İdari / Mali": [
+        "memur","uzman","şef","müdür","mudur","idari","mali","muhasebe",
+        "hukuk","avukat","ekonomist","istatistik","araştırmacı","analist",
+        "sekreter","büro","danışman","denetmen","kontrolör",
+    ],
+    "👮 Güvenlik / Askerlik": [
+        "güvenlik","guvenlik","koruma","bekçi","bekci","komiser","subay",
+        "astsubay","erbaş","er ","asker","jandarma","polis","itfaiye",
+        "sivil savunma",
+    ],
+    "🏥 Sağlık": [
+        "doktor","hekim","hemşire","hemsire","eczacı","eczaci","sağlık",
+        "saglik","psikolog","fizyoterapist","laborant","röntgen","diş",
+        "veteriner","biyolog",
+    ],
+    "🎓 Eğitim / Akademik": [
+        "öğretmen","ogretmen","eğitim","egitim","akademik","öğretim",
+        "ogretim","pedagog","rehber","koordinatör",
+    ],
+    "🔧 İşçi / Usta": [
+        "işçi","isci","usta","şoför","sofor","sürücü","forklift",
+        "kaynakçı","tesisatçı","boyacı","marangoz","aşçı","asci",
+        "temizlik","bahçıvan","teknisyen yardımcısı","yardımcı",
+    ],
+    "📊 Diğer": [],  # Hiçbir kategoriye girmeyen
 }
 
 # ─────────────────────────────────────────────
@@ -73,327 +86,108 @@ def normalize(m):
 def simdi_tr():
     return datetime.now(TZ_TURKIYE)
 
-# ─────────────────────────────────────────────
-# BOT KORUMASI AŞMA — KATMANLI YAKLAŞIM
-# ─────────────────────────────────────────────
+def meslek_kategori_bul(metin):
+    n = normalize(metin)
+    for kat, kelimeler in MESLEK_KATEGORILERI.items():
+        if kat == "📊 Diğer":
+            continue
+        for k in kelimeler:
+            if k in n:
+                return kat
+    return "📊 Diğer"
 
-TARAYICI_PROFILLERI = [
-    # Chrome Android (kullanıcının gerçek tarayıcısı)
-    {
-        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
-                      "(KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36",
-        "sec-ch-ua": '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"',
-        "sec-ch-ua-mobile": "?1",
-        "sec-ch-ua-platform": '"Android"',
-    },
-    # Chrome Windows
-    {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                      "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-        "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
-    },
-    # Firefox
-    {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) "
-                      "Gecko/20100101 Firefox/123.0",
-    },
-]
+def durum_bul(metin):
+    ust = metin.upper()
+    if "İPTAL" in ust or "IPTAL" in ust:
+        return "iptal"
+    if "UZATILDI" in ust:
+        return "uzatildi"
+    return "aktif"
 
-ORTAK_HEADERS = {
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
-              "image/avif,image/webp,image/apng,*/*;q=0.8",
-    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Accept-Encoding": "gzip, deflate, br",
-    "DNT": "1",
-    "Upgrade-Insecure-Requests": "1",
-    "Connection": "keep-alive",
-    "Cache-Control": "no-cache",
-    "Pragma": "no-cache",
-}
-
-def session_olustur_requests(profil_idx=0):
-    """Standart requests session — farklı tarayıcı profilleri dene."""
-    s = requests.Session()
-    h = {**ORTAK_HEADERS, **TARAYICI_PROFILLERI[profil_idx % len(TARAYICI_PROFILLERI)]}
-    s.headers.update(h)
-    urllib3.disable_warnings()
-    try:
-        # Önce GET ile session cookie al
-        r = s.get(ANASAYFA_URL, verify=False, timeout=15, allow_redirects=True)
-        if r.status_code == 200:
-            return s, True
-    except Exception:
-        pass
-    return s, False
-
-def session_olustur_cloudscraper():
-    """cloudscraper ile Cloudflare bypass."""
-    if not CLOUDSCRAPER_VAR:
-        return None, False
-    try:
-        s = cloudscraper.create_scraper(
-            browser={"browser": "chrome", "platform": "android", "mobile": True}
-        )
-        r = s.get(ANASAYFA_URL, timeout=20)
-        if r.status_code == 200:
-            return s, True
-    except Exception:
-        pass
-    return None, False
-
-def session_olustur_curl():
-    """curl_cffi ile TLS parmak izi taklit."""
-    if not CURL_CFFI_VAR:
-        return None, False
-    try:
-        s = curl_requests.Session(impersonate="chrome110")
-        r = s.get(ANASAYFA_URL, timeout=20)
-        if r.status_code == 200:
-            return s, True
-    except Exception:
-        pass
-    return None, False
-
-def session_olustur():
-    """
-    Tüm yöntemleri sırayla dener, ilk çalışanı döner.
-    Döner: (session, tip_str)
-    """
-    # 1. cloudscraper
-    s, ok = session_olustur_cloudscraper()
-    if ok:
-        return s, "cloudscraper"
-
-    # 2. curl_cffi
-    s, ok = session_olustur_curl()
-    if ok:
-        return s, "curl_cffi"
-
-    # 3. requests — farklı profiller
-    for i in range(len(TARAYICI_PROFILLERI)):
-        s, ok = session_olustur_requests(i)
-        if ok:
-            return s, f"requests (profil {i+1})"
-
-    # 4. Hiçbiri tutmazsa son profil ile devam et (hata mesajı gösterilecek)
-    s, _ = session_olustur_requests(0)
-    return s, "requests (fallback)"
-
-def get_session():
-    if "http_session" not in st.session_state:
-        with st.spinner("🔐 Bağlantı kuruluyor..."):
-            s, tip = session_olustur()
-            st.session_state["http_session"] = s
-            st.session_state["session_tip"]  = tip
-    return st.session_state["http_session"]
+def durum_badge(durum):
+    return {"aktif": "🟢 Aktif", "uzatildi": "🟡 Uzatıldı", "iptal": "🔴 İptal"}.get(durum, "")
 
 # ─────────────────────────────────────────────
-# VERİ ÇEKME
+# VERİ ÇEKME (kullanıcının çalışan script mantığı)
 # ─────────────────────────────────────────────
-def tarih_parse(metin):
-    """'21 Şubat' veya '21 Şubat 2026' → (gun, ay, yil)"""
-    metin = metin.strip()
-    m = re.match(r"(\d{1,2})\s+(\w+)(?:\s+(\d{4}))?", metin)
-    if not m:
-        return None
-    gun = int(m.group(1))
-    ay_str = normalize(m.group(2))
-    yil = int(m.group(3)) if m.group(3) else simdi_tr().year
-    ay = TURKCE_AYLAR.get(ay_str)
-    if not ay:
-        return None
-    return (yil, ay, gun)
-
 def ilanları_cek_raw():
     """
-    Ana sayfadan tüm ilanları çeker.
-    Her ilan: {kurum, baslik, basvuru_tarihi, link, tarih_tuple, logo_url}
+    kamuilan.sbb.gov.tr ana sayfasından ilanları çeker.
+    (Kullanıcının test ettiği çalışan script'ten uyarlandı)
     """
-    session = get_session()
     try:
-        resp = session.get(ANASAYFA_URL, verify=False, timeout=20)
-        resp.raise_for_status()
+        r = requests.get(ANASAYFA_URL, headers=HEADERS, verify=False, timeout=20)
+        r.raise_for_status()
     except Exception as e:
         st.error(f"Sayfa çekilemedi: {e}")
         return []
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    soup = BeautifulSoup(r.text, "html.parser")
     ilanlar = []
     gorulen = set()
-    son_tarih = None
 
-    # Sayfa yapısı: tarih başlıkları + altında ilan kartları
-    # Tarihler genellikle "21 Şubat" formatında ayrı bir element
-    # İlan kartları: kurum adı + ilan başlığı + başvuru tarihi + link
-
-    # Tüm a taglerini tara — ilan detay linkleri ilanDetay.aspx içeriyor
-    for eleman in soup.find_all(True):
-        tag = eleman.name
-
-        # Tarih başlıklarını yakala (21 Şubat, 20 Şubat gibi)
-        metin = eleman.get_text(strip=True)
-        if tag in ("h3","h4","h5","span","div","p"):
-            t = tarih_parse(metin)
-            if t and len(metin) < 20:
-                son_tarih = t
-                continue
-
-        # İlan linklerini yakala
-        if tag == "a":
-            href = eleman.get("href", "")
-            if "ilanDetay.aspx" not in href:
-                continue
-            tam_url = urljoin(ANASAYFA_URL, href)
-            if tam_url in gorulen:
-                continue
-            gorulen.add(tam_url)
-
-            # Kart içeriğini al - en yakın anlamlı kapsayıcıya çık
-            kapsayici = eleman
-            for _ in range(5):
-                p = kapsayici.parent
-                if not p:
-                    break
-                metin_uzunluk = len(p.get_text(strip=True))
-                if metin_uzunluk > 20:
-                    kapsayici = p
-                    break
-                kapsayici = p
-
-            kart_metin = kapsayici.get_text(" ", strip=True)
-
-            # Logo URL
-            logo = None
-            img = kapsayici.find("img")
-            if img and img.get("src"):
-                logo = urljoin(ANASAYFA_URL, img["src"])
-
-            # Başvuru tarihi aralığı (parantez içinde genellikle)
-            basvuru = ""
-            tarih_m = re.search(r"\(([^)]+)\)", kart_metin)
-            if tarih_m:
-                basvuru = tarih_m.group(1).strip()
-
-            # Kurum adı ve ilan başlığı
-            # Genellikle BÜYÜK HARF kurum adı + ilan başlığı
-            satirlar = [s for s in kart_metin.splitlines() if s.strip()]
-            kurum = ""
-            baslik = eleman.get_text(strip=True)
-
-            # İlanın link metni boşsa kart metninden çıkar
-            if not baslik or len(baslik) < 5:
-                baslik = kart_metin[:120]
-
-            ilanlar.append({
-                "kurum"         : kurum,
-                "baslik"        : baslik,
-                "basvuru_tarihi": basvuru,
-                "link"          : tam_url,
-                "tarih"         : son_tarih,
-                "logo_url"      : logo,
-            })
-
-    # Eğer yukarıdaki yaklaşım az ilan döndürüyorsa alternatif yöntem
-    if len(ilanlar) < 3:
-        ilanlar = ilanları_cek_alternatif(soup)
-
-    return ilanlar
-
-
-def ilanları_cek_alternatif(soup):
-    """
-    Alternatif: sayfadaki tüm ilanDetay linklerini bul,
-    her birinin kart yapısını farklı şekilde oku.
-    """
-    ilanlar = []
-    gorulen = set()
-    son_tarih = None
-
-    # Önce tüm metni tara, tarih kalıplarını bul
-    for el in soup.find_all(string=re.compile(r"^\d{1,2}\s+\w+$")):
-        t = tarih_parse(el.strip())
-        if t:
-            son_tarih = t
-
-    for a in soup.find_all("a", href=re.compile(r"ilanDetay\.aspx")):
-        href = a.get("href","")
-        tam_url = urljoin(ANASAYFA_URL, href)
-        if tam_url in gorulen:
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if "ilanDetay.aspx?kod=" not in href:
             continue
-        gorulen.add(tam_url)
 
-        # Kart: linkin en yakın büyük kapsayıcısı
-        kart = a
-        for _ in range(8):
-            parent = kart.parent
-            if not parent:
-                break
-            if parent.name in ("li","article","div","td"):
-                txt = parent.get_text(" ", strip=True)
-                if len(txt) > 15:
-                    kart = parent
-                    break
-            kart = parent
+        # Kod çıkar — tekrar kontrolü için
+        raw_kod = href.split("kod=")[1]
+        kod     = unquote(raw_kod)
+        if kod in gorulen:
+            continue
+        gorulen.add(kod)
 
-        kart_metin = kart.get_text(" ", strip=True)
+        metin = a.get_text(strip=True)
+        if not metin:
+            continue
 
-        # Logo
-        logo = None
-        img = kart.find("img")
-        if img:
-            logo = urljoin(ANASAYFA_URL, img.get("src",""))
+        link = urljoin(BASE_URL, href)
 
-        # Başvuru tarihi
+        # Başvuru tarihi aralığı (parantez içinde)
         basvuru = ""
-        tarih_m = re.search(r"\(\s*(\d+\s+\w+\s*[-–]\s*\d+\s+\w+)\s*\)", kart_metin)
+        tarih_m = re.search(r"\(([^)]+)\)", metin)
         if tarih_m:
             basvuru = tarih_m.group(1).strip()
+            metin   = metin[:tarih_m.start()].strip()
 
-        baslik = a.get_text(strip=True) or kart_metin[:100]
+        # Kurum + pozisyon ayrıştır (genellikle BÜYÜK HARF kurum adı)
+        # Format: "KURUM ADI\nX POZİSYON ALACAK" veya "KURUM ADI X POZİSYON ALACAK"
+        satirlar = [s.strip() for s in metin.split("\n") if s.strip()]
+        if len(satirlar) >= 2:
+            kurum  = satirlar[0]
+            baslik = " ".join(satirlar[1:])
+        else:
+            # Tek satır — büyük harfli başlangıç kurum, küçük harfli devam pozisyon
+            parcalar = re.split(r"\s{2,}", metin, maxsplit=1)
+            if len(parcalar) == 2:
+                kurum, baslik = parcalar
+            else:
+                kurum  = ""
+                baslik = metin
+
+        durum    = durum_bul(metin)
+        kategori = meslek_kategori_bul(metin)
 
         ilanlar.append({
-            "kurum"         : "",
-            "baslik"        : baslik,
+            "kod"           : kod,
+            "kurum"         : kurum.strip(),
+            "baslik"        : baslik.strip() or metin,
+            "tam_metin"     : metin,
             "basvuru_tarihi": basvuru,
-            "link"          : tam_url,
-            "tarih"         : son_tarih,
-            "logo_url"      : logo,
+            "link"          : link,
+            "durum"         : durum,
+            "kategori"      : kategori,
         })
 
     return ilanlar
 
-
 def veri_guncelle():
     with st.spinner("🔄 İlanlar güncelleniyor..."):
-        # Session yenile — yeni bağlantı kur
-        if "http_session" in st.session_state:
-            del st.session_state["http_session"]
-        get_session()  # yeni session oluştur
-        tip = st.session_state.get("session_tip", "?")
         ilanlar = ilanları_cek_raw()
-
-    # Bağlantı tipini göster
-    if ilanlar:
-        st.success(f"✅ {len(ilanlar)} ilan çekildi · Bağlantı: `{tip}`")
-    else:
-        # Kurulum talimatı göster
-        st.warning(f"""
-⚠️ İlan çekilemedi · Bağlantı tipi: `{tip}`
-
-**Daha güçlü bot koruması aşma için şunları kur:**
-```
-pip install cloudscraper
-pip install curl-cffi
-```
-Kurulduktan sonra uygulamayı yeniden başlat ve tekrar dene.
-""")
-
     st.session_state["ilanlar"]        = ilanlar
     st.session_state["son_guncelleme"] = simdi_tr()
     return ilanlar
-
 
 def veri_yukle():
     simdi = simdi_tr()
@@ -407,118 +201,96 @@ def veri_yukle():
 # ─────────────────────────────────────────────
 # İLAN DETAY + PDF
 # ─────────────────────────────────────────────
-JENERIK_METINLER = {
-    "dosyayi gorun", "goruntule", "goster", "indir", "tikla",
-    "tiklayin", "download", "open", "view", "dosyayi indir", "ekler"
-}
-
-SAYFA_LINKLERI = re.compile(r"ilanDetay|arsiv|Default|javascript:|#|mailto:|tel:", re.I)
-
-def dosya_linki_mi(href, base_url):
-    hl = href.lower()
-    for ext in (".pdf",".doc",".docx",".xls",".xlsx",".zip"):
-        if hl.endswith(ext):
-            return True
-    kaliplar = ["getfile","dosyagetir","filedownload","download","/dosya/","/files/","/upload"]
-    for k in kaliplar:
-        if k in hl:
-            return True
-    if re.search(r"[?&](id|dosyaid|file|f)=\d+", hl):
-        return True
-    return False
-
-def pdf_icerigi_cek(pdf_url, session):
+def pdf_icerigi_cek(pdf_url):
+    """PDF'in metin içeriğini çeker (Groq özetlemesi için)."""
     if not PDF_DESTEKLI:
         return ""
     try:
-        resp = session.get(pdf_url, verify=False, timeout=15)
-        resp.raise_for_status()
-        reader = PyPDF2.PdfReader(io.BytesIO(resp.content))
-        metin = ""
-        for sayfa in reader.pages[:5]:
+        r = requests.get(pdf_url, headers=HEADERS, verify=False, timeout=20)
+        r.raise_for_status()
+        # İçerik tipi PDF mi?
+        ct = r.headers.get("Content-Type","")
+        if "pdf" not in ct.lower() and not pdf_url.lower().endswith(".pdf"):
+            # PDF değil, HTML olabilir
+            return ""
+        reader = PyPDF2.PdfReader(io.BytesIO(r.content))
+        metin  = ""
+        for sayfa in reader.pages[:6]:
             metin += sayfa.extract_text() or ""
-        return metin[:3000].strip()
+        return metin[:4000].strip()
     except Exception:
         return ""
 
-def pdf_ad_bul(a_tag, href):
-    from urllib.parse import unquote
-    link_metni = a_tag.get_text(strip=True)
-    norm_link  = normalize(link_metni)
-    if link_metni and len(link_metni) > 4 and not any(j in norm_link for j in JENERIK_METINLER):
-        return link_metni
-    try:
-        kapsayici = a_tag.parent
-        for _ in range(5):
-            if kapsayici is None: break
-            metin = kapsayici.get_text(" ", strip=True)
-            eslesme = re.search(r"([^\n]{3,80}[.]pdf)", metin, re.I)
-            if eslesme:
-                ad = eslesme.group(1).strip()
-                if len(ad) < 100:
-                    return ad
-            kapsayici = kapsayici.parent
-    except Exception:
-        pass
-    dosya = href.split("/")[-1].split("?")[0]
-    try:
-        dosya = unquote(dosya)
-    except Exception:
-        pass
-    return dosya or "Belge"
-
 def ilan_icerik_cek(url):
-    session = get_session()
+    """
+    İlan linkini açar.
+    - Doğrudan PDF ise → PDF içeriğini çeker
+    - HTML ise → metni + PDF linklerini çeker
+    Döner: (metin, pdf_listesi, tip)
+      tip: "pdf" | "html"
+    """
     try:
-        resp = session.get(url, verify=False, timeout=20)
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+        r = requests.get(url, headers=HEADERS, verify=False, timeout=20)
+        r.raise_for_status()
+        ct = r.headers.get("Content-Type","")
 
-        # Tüm linkler (debug)
-        tum_linkler = []
-        for a in soup.find_all("a", href=True):
-            metin = a.get_text(strip=True)
-            href  = a["href"]
-            if href and href not in ("#","javascript:void(0)"):
-                tum_linkler.append({
-                    "metin": metin[:60],
-                    "href" : href[:120],
-                    "tam"  : urljoin(url, href)[:150],
-                })
+        # Doğrudan PDF geldi
+        if "pdf" in ct.lower():
+            if PDF_DESTEKLI:
+                try:
+                    reader  = PyPDF2.PdfReader(io.BytesIO(r.content))
+                    metin   = ""
+                    for sayfa in reader.pages[:8]:
+                        metin += sayfa.extract_text() or ""
+                    return metin[:5000].strip(), [{"ad": "İlan PDF", "url": url, "icerik": metin}], "pdf"
+                except Exception:
+                    pass
+            return "(PDF içeriği okunamadı — PyPDF2 kurulu değil)", [{"ad": "İlan PDF", "url": url, "icerik": ""}], "pdf"
 
-        # Nav/footer temizle
-        for tag in soup(["nav","header","footer","script","style"]):
-            tag.decompose()
+        # HTML sayfası
+        soup = BeautifulSoup(r.text, "html.parser")
 
-        # PDF / dosya linkleri
+        # Sayfadaki PDF linklerini bul
         pdf_listesi = []
-        gorulen = set()
+        gorulen_pdf = set()
         for a in soup.find_all("a", href=True):
             href = a["href"]
-            if not href or href.startswith(("javascript:","mailto:","tel:")):
+            hl   = href.lower()
+            if not (hl.endswith(".pdf") or "getfile" in hl or "download" in hl or "dosya" in hl):
                 continue
-            if not dosya_linki_mi(href, url):
+            tam = urljoin(url, href)
+            if tam in gorulen_pdf:
                 continue
-            tam_url = urljoin(url, href)
-            if tam_url in gorulen:
-                continue
-            gorulen.add(tam_url)
-            ad     = pdf_ad_bul(a, href)
-            icerik = pdf_icerigi_cek(tam_url, session)
-            pdf_listesi.append({"ad": ad, "url": tam_url, "icerik": icerik})
+            gorulen_pdf.add(tam)
+            ad     = a.get_text(strip=True) or href.split("/")[-1]
+            icerik = pdf_icerigi_cek(tam)
+            pdf_listesi.append({"ad": ad, "url": tam, "icerik": icerik})
 
+        # İçerik için iframe veya embed kontrol et (bazı siteler PDF'i embed gösterir)
+        for embed in soup.find_all(["iframe","embed"], src=True):
+            src = embed["src"]
+            if src.lower().endswith(".pdf") or "pdf" in src.lower():
+                tam = urljoin(url, src)
+                if tam not in gorulen_pdf:
+                    gorulen_pdf.add(tam)
+                    icerik = pdf_icerigi_cek(tam)
+                    pdf_listesi.append({"ad": "Gömülü PDF", "url": tam, "icerik": icerik})
+
+        # Sayfa ham metni
+        for tag in soup(["script","style","nav","header","footer"]):
+            tag.decompose()
         satirlar = [s for s in soup.get_text("\n", strip=True).splitlines() if s.strip()]
-        metin = "\n".join(satirlar[:400])
+        metin    = "\n".join(satirlar[:400])
 
-        return metin, pdf_listesi, tum_linkler
+        return metin, pdf_listesi, "html"
 
     except Exception as e:
-        return f"İçerik alınamadı: {e}", [], []
+        return f"İçerik alınamadı: {e}", [], "hata"
 
 # ─────────────────────────────────────────────
 # GROQ AI
 # ─────────────────────────────────────────────
-def groq_ozet(baslik, icerik, pdf_listesi=None):
+def groq_ozet(ilan, icerik, pdf_listesi=None, icerik_tipi="html"):
     su_an   = time.time()
     bekleme = RATE_LIMIT_SANIYE - (su_an - st.session_state.get("son_groq_istegi", 0))
     if bekleme > 0:
@@ -527,40 +299,42 @@ def groq_ozet(baslik, icerik, pdf_listesi=None):
         client = Groq(api_key=GROQ_API_KEY)
         sistem = """Sen Türkiye kamu kurumlarındaki personel alım ilanlarını analiz eden bir uzmansın.
 
-Görevin: Verilen ilan metnini AYNEN ve EKSİKSİZ analiz etmek.
+Görevin: İlan metnini EKSİKSİZ analiz et.
 
 KRİTİK KURALLAR:
-1. Metinde geçen TÜM sayısal ve spesifik bilgileri yaz: ölçüler, adetler, saatler, tarihler, adresler, banka adları, form adları vb.
-2. Listeler varsa (örn: istenen belgeler, aranan nitelikler) HER maddeyi ayrı satırda numaralı yaz.
-3. Metinde OLMAYAN hiçbir bilgiyi uydurma.
-4. Yanıtını Türkçe ver.
+1. Tüm sayısal bilgileri yaz: adet, yaş sınırı, puan, tarih, adres vb.
+2. İstenen belgeler listesini numaralı ve eksiksiz yaz.
+3. Uydurmayacaksın — sadece metinde geçen bilgileri kullan.
+4. Türkçe yanıt ver.
 
-Şu başlıkları kullan (bilgi yoksa o başlığı atla):
-
+Şu başlıkları kullan (bilgi yoksa atla):
 📋 **İlan Özeti**
 🏛️ **Kurum**
-🎯 **Aranan Pozisyon(lar)**
+🎯 **Pozisyon ve Kadro**
 🔢 **Alınacak Kişi Sayısı**
 📚 **Aranan Şartlar / Nitelikler**
 📋 **İstenen Belgeler**
-📅 **Önemli Tarihler**
-📝 **Başvuru Bilgileri**
-⚠️ **Dikkat Edilmesi Gerekenler**
-⬇️ **Ekli Dosyalar** (varsa)"""
+📅 **Başvuru Tarihleri**
+📝 **Başvuru Yöntemi**
+⚠️ **Dikkat Edilmesi Gerekenler**"""
 
-        ek_metin = ""
+        ek = ""
         if pdf_listesi:
-            ek_metin = "\n\n--- EKLİ DOSYALAR ---\n"
+            ek = "\n\n--- EKLİ PDF İÇERİKLERİ ---\n"
             for p in pdf_listesi:
-                ek_metin += f"\nDosya: {p['ad']}\nURL: {p['url']}\n"
-                if p["icerik"]:
-                    ek_metin += f"İçerik:\n{p['icerik'][:1500]}\n"
+                if p.get("icerik"):
+                    ek += f"\n[{p['ad']}]\n{p['icerik'][:2000]}\n"
 
         yanit = client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[
                 {"role":"system","content":sistem},
-                {"role":"user","content":f"İlan Başlığı: {baslik}\n\nİlan İçeriği:\n{icerik}{ek_metin}"},
+                {"role":"user","content":
+                    f"Kurum: {ilan.get('kurum','')}\n"
+                    f"İlan: {ilan.get('tam_metin','')}\n"
+                    f"Başvuru: {ilan.get('basvuru_tarihi','')}\n\n"
+                    f"İçerik ({icerik_tipi}):\n{icerik}{ek}"
+                },
             ],
             temperature=0.1,
             max_tokens=2500,
@@ -570,31 +344,52 @@ KRİTİK KURALLAR:
     except Exception as e:
         hata = str(e)
         if "rate_limit" in hata.lower():
-            return "⏳ Groq rate limit aşıldı. Lütfen birkaç saniye bekleyip tekrar deneyin."
+            return "⏳ Rate limit — birkaç saniye bekleyip tekrar dene."
         return f"❌ Groq hatası: {hata}"
 
 # ─────────────────────────────────────────────
 # FAVORİLER
 # ─────────────────────────────────────────────
-def favori_toggle(link):
+def favori_toggle(kod):
     favs = st.session_state.setdefault("kamu_favoriler", set())
-    if link in favs:
-        favs.discard(link)
-    else:
-        favs.add(link)
+    if kod in favs: favs.discard(kod)
+    else:           favs.add(kod)
 
-def favori_mi(link):
-    return link in st.session_state.get("kamu_favoriler", set())
+def favori_mi(kod):
+    return kod in st.session_state.get("kamu_favoriler", set())
 
 # ─────────────────────────────────────────────
-# AKILLI ARAMA
+# FİLTRELE
 # ─────────────────────────────────────────────
-def arama_eslesiyor(arama_metni, ilan):
-    if not arama_metni:
-        return True
-    hedef = normalize(ilan["baslik"] + " " + ilan.get("kurum",""))
-    kelimeler = normalize(arama_metni).split()
+def arama_eslesiyor(arama, ilan):
+    if not arama: return True
+    hedef    = normalize(ilan["tam_metin"] + " " + ilan.get("kurum",""))
+    kelimeler = normalize(arama).split()
     return all(k in hedef for k in kelimeler)
+
+def ilan_filtrele(ilanlar, filtre):
+    sonuc = ilanlar
+
+    # Favoriler
+    if filtre["sadece_favori"]:
+        favs  = st.session_state.get("kamu_favoriler", set())
+        sonuc = [d for d in sonuc if d["kod"] in favs]
+
+    # Durum
+    if filtre["durum"] != "Tümü":
+        durum_map = {"🟢 Aktif":"aktif","🟡 Uzatıldı":"uzatildi","🔴 İptal":"iptal"}
+        hedef = durum_map.get(filtre["durum"],"aktif")
+        sonuc = [d for d in sonuc if d["durum"] == hedef]
+
+    # Meslek kategorisi
+    if filtre["kategori"] != "Tümü":
+        sonuc = [d for d in sonuc if d["kategori"] == filtre["kategori"]]
+
+    # Arama
+    if filtre["arama"]:
+        sonuc = [d for d in sonuc if arama_eslesiyor(filtre["arama"], d)]
+
+    return sonuc
 
 # ─────────────────────────────────────────────
 # CSS
@@ -602,7 +397,7 @@ def arama_eslesiyor(arama_metni, ilan):
 CSS = """
 <style>
 .kamu-kart {
-    background: #1a1d2e;
+    background: #131620;
     border-left: 4px solid #7c3aed;
     border-radius: 8px;
     padding: 14px 18px;
@@ -612,19 +407,28 @@ CSS = """
     font-size: 15px;
     font-weight: 600;
     color: #e8eaf0;
-    margin-bottom: 4px;
     line-height: 1.4;
+    margin-bottom: 3px;
+}
+.kamu-kurum {
+    font-size: 12px;
+    font-weight: 700;
+    color: #a78bfa;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
 }
 .kamu-meta {
     font-size: 12px;
     color: #9aa0b4;
-    margin-top: 3px;
 }
 .kamu-tarih {
-    font-size: 12px;
     color: #f59e0b;
     font-weight: 500;
 }
+.kamu-durum-aktif   { color: #22c55e; font-weight: 600; }
+.kamu-durum-uzatildi{ color: #eab308; font-weight: 600; }
+.kamu-durum-iptal   { color: #ef4444; font-weight: 600; }
 .arama-ipucu {
     font-size: 11px;
     color: #6b7280;
@@ -637,46 +441,46 @@ CSS = """
 # KART
 # ─────────────────────────────────────────────
 def ilan_karti_goster(d, idx):
-    fav      = favori_mi(d["link"])
+    fav      = favori_mi(d["kod"])
     fav_ikon = "⭐" if fav else "☆"
 
-    tarih_str = ""
-    if d.get("basvuru_tarihi"):
-        tarih_str = f"📅 {d['basvuru_tarihi']}"
-
-    kurum_str = f"🏛️ {d['kurum']}  " if d.get("kurum") else ""
+    durum_css = {"aktif":"kamu-durum-aktif","uzatildi":"kamu-durum-uzatildi","iptal":"kamu-durum-iptal"}.get(d["durum"],"")
+    durum_txt = durum_badge(d["durum"])
 
     st.markdown(f"""
     <div class="kamu-kart">
-        <div class="kamu-baslik">{d['baslik']}</div>
-        <div class="kamu-meta">{kurum_str}<span class="kamu-tarih">{tarih_str}</span></div>
+        <div class="kamu-kurum">{d['kurum'] or '—'}</div>
+        <div class="kamu-baslik">{d['kategori']} &nbsp; {d['baslik'] or d['tam_metin']}</div>
+        <div class="kamu-meta">
+            <span class="{durum_css}">{durum_txt}</span>
+            {"&nbsp;·&nbsp;<span class='kamu-tarih'>📅 " + d['basvuru_tarihi'] + "</span>" if d['basvuru_tarihi'] else ""}
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([2, 2, 1])
 
+    anahtar  = f"ki_ozet_{idx}"
+    pdf_key  = f"ki_pdf_{idx}"
+
     with col1:
         st.link_button("🔗 İlana Git", url=d["link"], use_container_width=True)
 
-    anahtar   = f"kamu_ozet_{idx}"
-    pdf_key   = f"kamu_pdf_{idx}"
-    link_key  = f"kamu_lnk_{idx}"
-
     with col2:
-        if st.button("🤖 AI Özet", key=f"kamu_btn_{idx}", use_container_width=True):
-            with st.spinner("📖 İlan okunuyor..."):
-                icerik, pdf_listesi, tum_linkler = ilan_icerik_cek(d["link"])
-                st.session_state[pdf_key]  = pdf_listesi
-                st.session_state[link_key] = tum_linkler
+        if st.button("🤖 AI Özet", key=f"ki_btn_{idx}", use_container_width=True):
+            with st.spinner("📖 İlan açılıyor..."):
+                icerik, pdf_listesi, tip = ilan_icerik_cek(d["link"])
+                st.session_state[pdf_key] = pdf_listesi
             with st.spinner("🤖 AI özetleniyor..."):
-                ozet = groq_ozet(d["baslik"], icerik, pdf_listesi)
+                ozet = groq_ozet(d, icerik, pdf_listesi, tip)
                 st.session_state[anahtar] = ozet
 
     with col3:
-        if st.button(f"{fav_ikon} Favori", key=f"kamu_fav_{idx}", use_container_width=True):
-            favori_toggle(d["link"])
+        if st.button(f"{fav_ikon} Favori", key=f"ki_fav_{idx}", use_container_width=True):
+            favori_toggle(d["kod"])
             st.rerun()
 
+    # AI Özet kutusu
     if anahtar in st.session_state:
         with st.expander("📄 AI Özeti", expanded=True):
             st.markdown(st.session_state[anahtar])
@@ -686,26 +490,18 @@ def ilan_karti_goster(d, idx):
         if pdf_listesi:
             st.markdown("**📎 Ekli Belgeler — İndir:**")
             for pdf in pdf_listesi:
-                col_ad, col_btn = st.columns([4, 1])
-                with col_ad:
+                ca, cb = st.columns([4, 1])
+                with ca:
                     st.markdown(
                         f"<div style='padding:5px 0;font-size:14px;'>📄 {pdf['ad']}</div>",
                         unsafe_allow_html=True,
                     )
-                with col_btn:
+                with cb:
                     st.link_button("⬇️ İndir", url=pdf["url"], use_container_width=True)
-            st.markdown("")
-        else:
-            tum_linkler = st.session_state.get(link_key, [])
-            if tum_linkler:
-                with st.expander("🔍 Sayfadaki Tüm Linkler (debug — PDF bulunamadı)", expanded=False):
-                    for lnk in tum_linkler:
-                        st.markdown(f"**Metin:** `{lnk['metin']}` | **href:** `{lnk['href']}`")
 
-        if st.button("✖️ Kapat", key=f"kamu_kapat_{idx}"):
-            for k in [anahtar, pdf_key, link_key]:
-                if k in st.session_state:
-                    del st.session_state[k]
+        if st.button("✖️ Kapat", key=f"ki_kapat_{idx}"):
+            for k in [anahtar, pdf_key]:
+                st.session_state.pop(k, None)
             st.rerun()
 
     st.divider()
@@ -717,70 +513,85 @@ def sidebar_filtre():
     st.sidebar.title("📋 Kamu Personel\nAlım İlanları")
     st.sidebar.markdown("---")
 
+    # ── Durum filtresi ──
+    st.sidebar.subheader("🔴 Durum")
+    durum = st.sidebar.radio(
+        "İlan durumu:",
+        options=["Tümü","🟢 Aktif","🟡 Uzatıldı","🔴 İptal"],
+        index=1,  # varsayılan: Aktif
+        key="ki_durum",
+    )
+
+    # ── Meslek kategorisi ──
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("👔 Meslek")
+    kategoriler = ["Tümü"] + list(MESLEK_KATEGORILERI.keys())
+    kategori = st.sidebar.selectbox("Kategori:", kategoriler, key="ki_kategori")
+
+    # ── Akıllı Arama ──
+    st.sidebar.markdown("---")
     st.sidebar.subheader("🔤 Akıllı Arama")
     arama = st.sidebar.text_input(
-        "Kurum veya ilan başlığında ara:",
-        placeholder="örn: sahil güvenlik, mühendis",
-        key="kamu_arama",
+        "Kurum veya pozisyon ara:",
+        placeholder="örn: sahil, mühendis, istanbul",
+        key="ki_arama",
     )
     st.sidebar.markdown(
-        "<div class='arama-ipucu'>💡 Birden fazla kelime yazabilirsin. "
-        "Türkçe karakter fark etmez.</div>",
+        "<div class='arama-ipucu'>💡 Birden fazla kelime — hepsi eşleşmeli. Türkçe karakter fark etmez.</div>",
         unsafe_allow_html=True,
     )
 
+    # ── Favoriler ──
     st.sidebar.markdown("---")
     sadece_favori = st.sidebar.checkbox(
         f"⭐ Sadece Favoriler ({len(st.session_state.get('kamu_favoriler', set()))})",
-        key="kamu_sadece_favori",
+        key="ki_favori",
     )
 
-    # Kullanma Kılavuzu
+    # ── Kullanma Kılavuzu ──
     st.sidebar.markdown("---")
     with st.sidebar.expander("📖 Nasıl Kullanılır?", expanded=False):
         st.sidebar.markdown("""
-**🔄 Verileri Güncelle**
-Siteyi anlık tarar, yeni ilanları çeker.
-Her gün otomatik güncellenir.
+**🔴 Durum Filtresi**
+İlanları durumuna göre filtreler:
+- *Aktif* → Başvurusu devam eden ilanlar
+- *Uzatıldı* → Süresi uzatılmış ilanlar
+- *İptal* → İptal edilmiş ilanlar
+
+---
+
+**👔 Meslek Kategorisi**
+İlanları meslek grubuna göre filtreler:
+Mühendis, sağlık, güvenlik, işçi vb.
 
 ---
 
 **🔤 Akıllı Arama**
-Kurum adı veya ilan başlığında arama yapar.
-Birden fazla kelime yazabilirsin — hepsi
-eşleşmeli. Türkçe karakter takılmaz.
+Kurum adı veya pozisyon adına göre arar.
+Birden fazla kelime yazabilirsin — hepsi eşleşmeli.
+Türkçe karakter fark etmez.
 
 ---
 
 **⭐ Favoriler**
-☆ Favori butonuna basınca ilan yıldızlanır.
-"Sadece Favoriler" ile sadece onları görürsün.
-Favoriler sayfanın üstünde her zaman görünür.
+☆ Favori butonuna bas → ilan yıldızlanır.
+"Sadece Favoriler" kutusunu işaretle → sadece onları gör.
+Favoriler her zaman sayfanın üstünde görünür.
 
 ---
 
 **🤖 AI Özet**
-İlanı otomatik okuyup özetler:
-pozisyon, şartlar, tarihler, belgeler.
-Varsa ekli PDF'leri de indirme butonu ile gösterir.
+İlana ait PDF veya HTML sayfasını otomatik okur,
+yapay zeka ile özetler: şartlar, tarihler, belgeler.
+PDF varsa altında indirme butonu çıkar.
         """)
 
     return {
+        "durum"        : durum,
+        "kategori"     : kategori,
         "arama"        : arama.strip(),
         "sadece_favori": sadece_favori,
     }
-
-# ─────────────────────────────────────────────
-# FİLTRELE
-# ─────────────────────────────────────────────
-def ilan_filtrele(ilanlar, filtre):
-    sonuc = ilanlar
-    if filtre["sadece_favori"]:
-        favs  = st.session_state.get("kamu_favoriler", set())
-        sonuc = [d for d in sonuc if d["link"] in favs]
-    if filtre["arama"]:
-        sonuc = [d for d in sonuc if arama_eslesiyor(filtre["arama"], d)]
-    return sonuc
 
 # ─────────────────────────────────────────────
 # MAIN
@@ -794,21 +605,20 @@ def main():
     )
     st.markdown(CSS, unsafe_allow_html=True)
 
-    for k, v in [("son_groq_istegi", 0), ("kamu_favoriler", set())]:
+    for k, v in [("son_groq_istegi",0), ("kamu_favoriler",set())]:
         if k not in st.session_state:
             st.session_state[k] = v
 
     if not PDF_DESTEKLI:
-        st.info("ℹ️ PDF içerikleri için `pip install PyPDF2` kurabilirsin.")
+        st.info("ℹ️ PDF içerikleri için `pip install PyPDF2` kur.")
 
-    # Başlık + Güncelle
+    # ── Başlık + Güncelle ──
     col_b, col_btn = st.columns([5, 1])
     with col_b:
         st.title("📋 Kamu Personeli Alım İlanları")
     with col_btn:
         st.write("")
         if st.button("🔄 Verileri Güncelle", use_container_width=True):
-            st.cache_data.clear()
             veri_guncelle()
             st.success("Güncellendi!")
 
@@ -818,25 +628,26 @@ def main():
     if son:
         st.caption(f"📡 Kaynak: kamuilan.sbb.gov.tr · Son güncelleme: {son.strftime('%d.%m.%Y %H:%M')}")
 
-    # Varsayılan görünüm butonu
-    if st.button("🏠 Varsayılan Görünüme Dön", use_container_width=True):
-        for k in ["kamu_arama", "kamu_sadece_favori"]:
-            if k in st.session_state:
-                del st.session_state[k]
+    # ── Varsayılana Dön ──
+    if st.button("🏠 Varsayılan Görünüme Dön  ·  Aktif İlanlar", use_container_width=True):
+        for k in ["ki_durum","ki_kategori","ki_arama","ki_favori"]:
+            st.session_state.pop(k, None)
         st.rerun()
 
     if not ilanlar:
-        st.error("İlanlar yüklenemedi. Lütfen 'Verileri Güncelle' butonuna tıklayın.")
+        st.error("İlanlar yüklenemedi. 'Verileri Güncelle' butonuna tıklayın.")
         return
 
     filtre   = sidebar_filtre()
     filtreli = ilan_filtrele(ilanlar, filtre)
 
-    # İstatistik
-    c1, c2, c3 = st.columns(3)
-    c1.metric("📋 Toplam İlan", len(ilanlar))
-    c2.metric("🔍 Gösterilen",  len(filtreli))
-    c3.metric("⭐ Favoriler",   len(st.session_state.get("kamu_favoriler", set())))
+    # ── İstatistikler ──
+    aktif_sayisi = sum(1 for d in ilanlar if d["durum"]=="aktif")
+    c1,c2,c3,c4 = st.columns(4)
+    c1.metric("📋 Toplam İlan",  len(ilanlar))
+    c2.metric("🟢 Aktif İlan",   aktif_sayisi)
+    c3.metric("🔍 Gösterilen",   len(filtreli))
+    c4.metric("⭐ Favoriler",    len(st.session_state.get("kamu_favoriler",set())))
 
     st.markdown("---")
 
@@ -846,17 +657,33 @@ def main():
 
     # ── Favoriler — her zaman üstte ──
     favs = st.session_state.get("kamu_favoriler", set())
-    favori_ilanlar = [d for d in ilanlar if d["link"] in favs]
+    favori_ilanlar = [d for d in ilanlar if d["kod"] in favs]
     if favori_ilanlar:
         with st.expander(f"⭐ Favorilerim — {len(favori_ilanlar)} ilan", expanded=True):
             for d in favori_ilanlar:
-                ilan_karti_goster(d, hash(d["link"] + "_fav"))
+                ilan_karti_goster(d, hash(d["kod"] + "_fav"))
         st.markdown("---")
 
-    # ── Tüm ilanlar (tarih gruplama YOK — site zaten güncel ilanlar) ──
-    with st.expander(f"📋 Güncel İlanlar — {len(filtreli)} ilan", expanded=True):
+    # ── Meslek kategorisine göre grupla ──
+    if filtre["kategori"] == "Tümü" and not filtre["arama"] and not filtre["sadece_favori"]:
+        # Kategorilere göre gruplu görünüm
+        gruplar = defaultdict(list)
         for d in filtreli:
-            ilan_karti_goster(d, hash(d["link"]))
+            gruplar[d["kategori"]].append(d)
+
+        # Önce dolu kategorileri, sıralı göster
+        kat_sirasi = list(MESLEK_KATEGORILERI.keys())
+        for kat in kat_sirasi:
+            grup = gruplar.get(kat, [])
+            if not grup: continue
+            with st.expander(f"{kat} — {len(grup)} ilan", expanded=(kat != "📊 Diğer")):
+                for d in grup:
+                    ilan_karti_goster(d, hash(d["kod"]))
+    else:
+        # Düz liste
+        with st.expander(f"📋 İlanlar — {len(filtreli)} sonuç", expanded=True):
+            for d in filtreli:
+                ilan_karti_goster(d, hash(d["kod"]))
 
 if __name__ == "__main__":
     main()
