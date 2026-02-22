@@ -193,9 +193,58 @@ def pdf_icerigi_cek(pdf_url):
     except Exception:
         return ""
 
+# Anlamlı olmayan, jenerik link metinleri (bunlardan dosya adı çıkarılmaz)
+GORSUZ_LINK_METINLERI = {
+    "dosyayi gorun", "goruntule", "goster", "indir", "tikla",
+    "tiklayin", "tiklayniz", "icin tiklayin", "buraya tiklayin",
+    "download", "open", "view", "dosya", "pdf", "click here"
+}
+
+def pdf_ad_bul(a_tag, href):
+    """
+    PDF dosyası için anlamlı bir ad bulmaya çalışır.
+    Öncelik sırası:
+      1. Linkin kendi metni (jenerik değilse)
+      2. Link öncesindeki kardeş/ebeveyn elementlerin metni (.pdf içeriyorsa)
+      3. URL'den dosya adı
+    """
+    from urllib.parse import unquote
+
+    link_metni = a_tag.get_text(strip=True)
+    norm_link  = normalize(link_metni)
+
+    # Anlamlı link metni → direkt kullan
+    if (link_metni
+            and len(link_metni) > 4
+            and not any(j in norm_link for j in GORSUZ_LINK_METINLERI)):
+        return link_metni
+
+    # Yakın çevrede .pdf içeren metin ara (genellikle dosya adı linkin üstündedir)
+    for onceki in [a_tag.find_previous_sibling(), a_tag.parent,
+                   a_tag.parent.find_previous_sibling() if a_tag.parent else None]:
+        if onceki is None:
+            continue
+        try:
+            metin = onceki.get_text(strip=True)
+            if metin and ".pdf" in metin.lower() and len(metin) < 120:
+                return metin
+        except Exception:
+            pass
+
+    # Fallback: URL'den dosya adı
+    dosya = href.split("/")[-1].split("?")[0]
+    try:
+        dosya = unquote(dosya)
+    except Exception:
+        pass
+    return dosya or "Belge"
+
+
 def ilan_icerik_cek(url):
     """
     İlan sayfasından ham metin ve PDF linklerini çeker.
+    - Sadece ana içerik alanındaki PDF'leri alır (nav/footer/sidebar hariç)
+    - PDF adını linkin metninden değil, dosya adından veya yakın başlıktan alır
     Döner: (metin: str, pdf_listesi: list[dict])
       pdf_listesi elemanları: {"ad": str, "url": str, "icerik": str}
     """
@@ -204,23 +253,58 @@ def ilan_icerik_cek(url):
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
 
-        # PDF linklerini topla
+        # ── Ana içerik alanını bul ──
+        # nav / header / footer içindeki PDF'leri istemiyoruz
+        icerik_alani = (
+            soup.find("main")
+            or soup.find("article")
+            or soup.find(id=re.compile(r"content|icerik|detay|main", re.I))
+            or soup.find(class_=re.compile(r"content|icerik|detay|main", re.I))
+            or soup  # hiçbiri yoksa tüm sayfa
+        )
+
+        # ── PDF linklerini topla ──
         pdf_listesi = []
         gorulen_pdf = set()
-        for a in soup.find_all("a", href=True):
-            href = a["href"]
-            # .pdf uzantılı veya href'te pdf geçen linkler
-            if href.lower().endswith(".pdf") or "pdf" in href.lower():
-                tam_url = urljoin(url, href)
-                if tam_url in gorulen_pdf:
-                    continue
-                gorulen_pdf.add(tam_url)
-                ad = a.get_text(strip=True) or href.split("/")[-1]
-                icerik = pdf_icerigi_cek(tam_url)
-                pdf_listesi.append({"ad": ad, "url": tam_url, "icerik": icerik})
 
-        # Sayfa metni
-        for tag in soup(["script","style","nav","header","footer"]):
+        for a in icerik_alani.find_all("a", href=True):
+            href = a["href"]
+
+            # Sadece .pdf uzantılı ya da açık pdf/dosya yolu olan linkler
+            if not (href.lower().endswith(".pdf")
+                    or re.search(r"GetFile|Download|Dosya", href)
+                    or re.search(r"GetFile|Download|Dosya", href)):
+                continue
+
+            # Nav / header / footer içindeyse atla
+            icerik_disi = False
+            ata = a.parent
+            for _ in range(10):
+                if ata is None:
+                    break
+                tag_adi = getattr(ata, "name", "") or ""
+                cls_id  = " ".join(ata.get("class", [])) + " " + (ata.get("id") or "")
+                if tag_adi in ("nav", "header", "footer"):
+                    icerik_disi = True
+                    break
+                if re.search(r"\bnav\b|sidebar|footer|header|menu", cls_id, re.I):
+                    icerik_disi = True
+                    break
+                ata = ata.parent
+            if icerik_disi:
+                continue
+
+            tam_url = urljoin(url, href)
+            if tam_url in gorulen_pdf:
+                continue
+            gorulen_pdf.add(tam_url)
+
+            ad     = pdf_ad_bul(a, href)
+            icerik = pdf_icerigi_cek(tam_url)
+            pdf_listesi.append({"ad": ad, "url": tam_url, "icerik": icerik})
+
+        # ── Sayfa ham metni ──
+        for tag in soup(["script", "style", "nav", "header", "footer"]):
             tag.decompose()
         satirlar = [s for s in soup.get_text("\n", strip=True).splitlines() if s.strip()]
         metin = "\n".join(satirlar[:400])
