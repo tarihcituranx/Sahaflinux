@@ -1,9 +1,10 @@
 """
 GamerPower Ücretsiz Oyun & Loot Takibi
-Streamlit + Groq (Türkçe çeviri) + GamerPower API
+Streamlit + Groq (Türkçe çeviri) + GamerPower API + TCMB Kur Entegrasyonu
 """
 
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -139,12 +140,27 @@ h1, h2, h3 {
     color: #5dba70;
 }
 
+.gp-deger-kapsayici {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: flex-start;
+}
+
 .gp-deger {
     font-family: 'Rajdhani', sans-serif;
     font-size: 18px;
     font-weight: 700;
     color: #00c2ff;
-    text-align: right;
+    white-space: nowrap;
+}
+
+.gp-deger-try {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: #00e676;
+    margin-top: 2px;
     white-space: nowrap;
 }
 
@@ -182,6 +198,15 @@ h1, h2, h3 {
     line-height: 1;
 }
 
+.worth-sayi-try {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: #4a8a6a;
+    margin-top: -5px;
+    margin-bottom: 8px;
+}
+
 .worth-alt {
     font-size: 13px;
     color: #4a8a6a;
@@ -197,6 +222,27 @@ h1, h2, h3 {
 }
 </style>
 """
+
+# ─────────────────────────────────────────────
+# GÜNCEL KUR (TCMB)
+# ─────────────────────────────────────────────
+@st.cache_data(ttl=3600)  # Kuru 1 saatte bir güncelle
+def kur_getir_tcmb() -> float:
+    try:
+        url = "https://www.tcmb.gov.tr/kurlar/today.xml"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        
+        # XML verisini ayrıştırıyoruz (JSON olmadığı için ElementTree kullanıyoruz)
+        root = ET.fromstring(r.content)
+        for currency in root.findall('Currency'):
+            if currency.get('CurrencyCode') == 'USD':
+                forex_selling = currency.find('ForexSelling').text
+                return float(forex_selling)
+        return 0.0
+    except Exception as e:
+        st.sidebar.warning(f"Kur çekilemedi: {e}")
+        return 0.0
 
 # ─────────────────────────────────────────────
 # GAMERPOWER API
@@ -298,23 +344,15 @@ def bitis_formatla(tarih_str: str) -> str:
         return ""
     return f"⏰ Bitiş: {tarih_str}"
 
-def deger_formatla(deger: str) -> str:
-    if not deger or deger == "0.0" or deger.lower() == "n/a":
-        return ""
-    try:
-        return f"${float(deger):.2f}"
-    except Exception:
-        return deger
-
 # ─────────────────────────────────────────────
 # KART GÖSTER
 # ─────────────────────────────────────────────
-def ilan_karti_goster(ilan: dict, idx: int):
+def ilan_karti_goster(ilan: dict, idx: int, guncel_kur: float):
     baslik      = ilan.get("title","")
     aciklama_en = ilan.get("description","")
     platform    = ilan.get("platforms","")
     tur         = ilan.get("type","")
-    deger       = deger_formatla(str(ilan.get("worth","0")))
+    deger_usd_fl = worth_to_float(ilan.get("worth", "0"))
     gorsel      = ilan.get("image","")
     link        = ilan.get("open_giveaway_url","") or ilan.get("open_giveaway","")
     bitis       = bitis_formatla(ilan.get("end_date",""))
@@ -328,11 +366,19 @@ def ilan_karti_goster(ilan: dict, idx: int):
     if tur:
         etiket_html += f'<span class="gp-etiket gp-etiket-tur">{tur_etiket(tur)}</span>'
 
-    deger_html = (
-        f'<div class="gp-deger">{deger}</div>'
-        if deger else
-        '<div class="gp-deger gp-deger-bos">Ücretsiz</div>'
-    )
+    # Fiyat HTML'ini Dolar ve TL olacak şekilde ayarla
+    if deger_usd_fl > 0:
+        deger_tl = deger_usd_fl * guncel_kur
+        tl_gosterimi = f'<div class="gp-deger-try">~{deger_tl:.2f} ₺</div>' if guncel_kur > 0 else ""
+        deger_html = f"""
+        <div class="gp-deger-kapsayici">
+            <div class="gp-deger">${deger_usd_fl:.2f}</div>
+            {tl_gosterimi}
+        </div>
+        """
+    else:
+        deger_html = '<div class="gp-deger-kapsayici"><div class="gp-deger gp-deger-bos">Ücretsiz</div></div>'
+
 
     gorsel_html = (
         f'<img class="gp-gorsel" src="{gorsel}" alt="">'
@@ -393,19 +439,26 @@ def ilan_karti_goster(ilan: dict, idx: int):
 # ─────────────────────────────────────────────
 # WORTH KUTUSU
 # ─────────────────────────────────────────────
-def worth_goster():
+def worth_goster(guncel_kur: float):
     with st.spinner("📊 Anlık değer hesaplanıyor..."):
         veri = worth_getir()
 
     if not veri:
         return
 
-    toplam_deger  = veri.get("worth_estimation_usd","?")
-    aktif_sayi    = veri.get("active_giveaways_number","?")
+    toplam_deger_usd_str = veri.get("worth_estimation_usd", "0")
+    toplam_deger_usd = worth_to_float(toplam_deger_usd_str)
+    aktif_sayi       = veri.get("active_giveaways_number","?")
+
+    tl_gosterimi = ""
+    if guncel_kur > 0 and toplam_deger_usd > 0:
+        toplam_deger_tl = toplam_deger_usd * guncel_kur
+        tl_gosterimi = f'<div class="worth-sayi-try">~{toplam_deger_tl:,.0f} ₺</div>'
 
     st.markdown(f"""
     <div class="worth-kutu">
-        <div class="worth-sayi">${toplam_deger}</div>
+        <div class="worth-sayi">${toplam_deger_usd:,.2f}</div>
+        {tl_gosterimi}
         <div class="worth-alt">
             Şu an aktif <b>{aktif_sayi}</b> ücretsiz fırsatın toplam tahmini değeri
         </div>
@@ -415,7 +468,7 @@ def worth_goster():
 # ─────────────────────────────────────────────
 # SIDEBAR
 # ─────────────────────────────────────────────
-def sidebar_filtre() -> dict:
+def sidebar_filtre(guncel_kur: float) -> dict:
     st.sidebar.markdown("""
     <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;
          color:#00c2ff;letter-spacing:2px;margin-bottom:4px">
@@ -425,6 +478,9 @@ def sidebar_filtre() -> dict:
     Ücretsiz Oyun & Loot Takibi
     </div>
     """, unsafe_allow_html=True)
+
+    if guncel_kur > 0:
+        st.sidebar.info(f"💵 Güncel Kur: **{guncel_kur:.2f} ₺**")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("🕹️ Platform")
@@ -481,19 +537,22 @@ def main():
     if "gp_favoriler" not in st.session_state:
         st.session_state["gp_favoriler"] = set()
 
+    # Kuru bir kere çekiyoruz, uygulamada her yere paslıyoruz.
+    guncel_kur = kur_getir_tcmb()
+
     st.markdown("""
     <h1 style="font-family:'Rajdhani',sans-serif;font-size:36px;font-weight:700;
          color:#e8f4ff;letter-spacing:2px;margin-bottom:4px">
     🎮 ÜCRETSİZ OYUN & LOOT TAKİBİ
     </h1>
     <p style="color:#4a7a9a;font-size:14px;margin-top:0">
-    GamerPower — anlık fırsatlar, Groq ile Türkçe açıklamalar
+    GamerPower — anlık fırsatlar, Groq ile Türkçe açıklamalar ve Güncel Kur
     </p>
     """, unsafe_allow_html=True)
 
-    worth_goster()
+    worth_goster(guncel_kur)
 
-    filtre = sidebar_filtre()
+    filtre = sidebar_filtre(guncel_kur)
 
     with st.spinner("🎮 İlanlar yükleniyor..."):
         ilanlar = ilanlar_getir(
@@ -508,10 +567,10 @@ def main():
 
     col1, col2, col3 = st.columns(3)
     col1.metric("🎮 Toplam Fırsat", len(ilanlar))
-    col2.metric(
-        "💰 Toplam Değer",
-        f"${sum(worth_to_float(d.get('worth')) for d in ilanlar):.0f}",
-    )
+    
+    toplam_usd = sum(worth_to_float(d.get('worth')) for d in ilanlar)
+    col2.metric("💰 Toplam Değer", f"${toplam_usd:,.0f}")
+    
     col3.metric("⭐ Favoriler", len(st.session_state.get("gp_favoriler", set())))
 
     st.markdown("---")
@@ -521,7 +580,7 @@ def main():
         return
 
     for i, ilan in enumerate(ilanlar):
-        ilan_karti_goster(ilan, i)
+        ilan_karti_goster(ilan, i, guncel_kur)
 
 
 if __name__ == "__main__":
