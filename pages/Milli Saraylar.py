@@ -573,7 +573,7 @@ def ilan_karti_goster(d, idx):
 # SIDEBAR
 # ─────────────────────────────────────────────
 def sidebar_filtre(tum_yillar):
-    st.sidebar.title("🏛️ Milli Saraylar\nİlan Takip")
+    st.sidebar.title("🏛️ Milli Saraylar\nİlan Takip by Turan Kaya")
     st.sidebar.markdown("---")
 
     # Yıl modu
@@ -582,6 +582,7 @@ def sidebar_filtre(tum_yillar):
         "Göster:",
         options=["Sadece 2026 ve Sonrası", "Önceki Yıllar (2025 ve Öncesi)", "Filtresiz (Tümü)"],
         index=0,
+        key="filtre_mod",
     )
 
     secili_yillar = []
@@ -600,13 +601,14 @@ def sidebar_filtre(tum_yillar):
         "📊 Sınav Sonucu","📅 Sınav Takvimi","🔍 Başvuru Kontrol",
         "📨 Başvuru Duyurusu","🎯 KPSS/EKPSS","📣 Genel Duyuru",
     ]
-    secili_kategori = st.sidebar.selectbox("Kategori:", kategoriler)
+    secili_kategori = st.sidebar.selectbox("Kategori:", kategoriler, key="filtre_kategori")
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔤 Akıllı Arama")
     arama = st.sidebar.text_input(
         "Başlıkta ara:",
         placeholder="örn: uzman yardimci istanbul",
+        key="filtre_arama",
     )
     # İpucu
     st.sidebar.markdown(
@@ -618,7 +620,8 @@ def sidebar_filtre(tum_yillar):
     # Favori filtresi
     st.sidebar.markdown("---")
     sadece_favori = st.sidebar.checkbox(
-        f"⭐ Sadece Favoriler ({len(st.session_state.get('favoriler', set()))})"
+        f"⭐ Sadece Favoriler ({len(st.session_state.get('favoriler', set()))})",
+        key="filtre_favori",
     )
 
     # Kullanma Kılavuzu
@@ -752,6 +755,14 @@ def main():
     if son_guncelleme:
         st.caption(f"📡 Kaynak: millisaraylar.gov.tr · Son güncelleme: {son_guncelleme.strftime('%d.%m.%Y %H:%M')}")
 
+    # ── Varsayılana Dön butonu ──
+    if st.button("🏠 Varsayılan Görünüme Dön  ·  Yalnızca 2026 İlanları", use_container_width=True):
+        # Sidebar widget'larının key'leri ile session_state'i sıfırla
+        for k in ["filtre_mod", "filtre_kategori", "filtre_arama", "filtre_favori"]:
+            if k in st.session_state:
+                del st.session_state[k]
+        st.rerun()
+
     if not duyurular:
         st.error("Duyurular yüklenemedi. Lütfen 'Verileri Güncelle' butonuna tıklayın.")
         return
@@ -774,7 +785,16 @@ def main():
         st.info("Seçilen filtrelere uygun ilan bulunamadı.")
         return
 
-    # Yıla göre grupla
+    # ── Favori ilanlar — her zaman üstte görünür ──
+    favs = st.session_state.get("favoriler", set())
+    favori_ilanlar = [d for d in duyurular if d["link"] in favs]
+    if favori_ilanlar:
+        with st.expander(f"⭐ Favorilerim — {len(favori_ilanlar)} ilan", expanded=True):
+            for d in favori_ilanlar:
+                ilan_karti_goster(d, hash(d["link"] + "_fav"))
+        st.markdown("---")
+
+    # ── Yıla göre grupla (filtreli ilanlar) ──
     gruplar = defaultdict(list)
     for d in filtreli:
         gruplar[d["yil"] or 0].append(d)
