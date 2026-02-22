@@ -1,20 +1,24 @@
-"""
-Milli Saraylar Personel Alım Duyuruları - Streamlit Uygulaması
-Kurulum: pip install streamlit groq requests beautifulsoup4
-Çalıştırma: streamlit run millisaraylar_app.py
-"""
-
 import time
 import re
+import io
 from collections import defaultdict
 from urllib.parse import urljoin
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
+
+TZ_TURKIYE = timezone(timedelta(hours=3))
 
 import requests
 import urllib3
 import streamlit as st
 from bs4 import BeautifulSoup
 from groq import Groq
+
+# PyPDF2 opsiyonel - kurulu değilse PDF içeriği çekilmez ama link gösterilir
+try:
+    import PyPDF2
+    PDF_DESTEKLI = True
+except ImportError:
+    PDF_DESTEKLI = False
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -146,23 +150,25 @@ def duyurulari_cek_raw():
         })
     return duyurular
 
+def simdi_tr():
+    """Türkiye saatini döner (UTC+3)."""
+    return datetime.now(TZ_TURKIYE)
+
 def veri_guncelle():
     """Veriyi çekip session_state'e kaydeder."""
     with st.spinner("🔄 Duyurular güncelleniyor..."):
         duyurular = duyurulari_cek_raw()
     st.session_state["duyurular"]      = duyurular
-    st.session_state["son_guncelleme"] = datetime.now()
+    st.session_state["son_guncelleme"] = simdi_tr()
     return duyurular
 
 def veri_yukle():
     """Günlük otomatik güncelleme + ilk yükleme."""
-    simdi = datetime.now()
+    simdi = simdi_tr()
 
-    # İlk yükleme
     if "duyurular" not in st.session_state:
         return veri_guncelle()
 
-    # Günlük otomatik güncelleme
     son = st.session_state.get("son_guncelleme")
     if son and son.date() < simdi.date():
         return veri_guncelle()
@@ -170,24 +176,64 @@ def veri_yukle():
     return st.session_state["duyurular"]
 
 # ─────────────────────────────────────────────
-# İLAN İÇERİK
+# İLAN İÇERİK + PDF LİNKLERİ
 # ─────────────────────────────────────────────
+def pdf_icerigi_cek(pdf_url):
+    """PDF URL'sinden metin çeker. PyPDF2 kurulu değilse boş döner."""
+    if not PDF_DESTEKLI:
+        return ""
+    try:
+        resp = requests.get(pdf_url, headers=HEADERS, verify=False, timeout=20)
+        resp.raise_for_status()
+        reader = PyPDF2.PdfReader(io.BytesIO(resp.content))
+        metin = ""
+        for sayfa in reader.pages[:5]:  # en fazla 5 sayfa
+            metin += sayfa.extract_text() or ""
+        return metin[:3000].strip()
+    except Exception:
+        return ""
+
 def ilan_icerik_cek(url):
+    """
+    İlan sayfasından ham metin ve PDF linklerini çeker.
+    Döner: (metin: str, pdf_listesi: list[dict])
+      pdf_listesi elemanları: {"ad": str, "url": str, "icerik": str}
+    """
     try:
         resp = requests.get(url, headers=HEADERS, verify=False, timeout=20)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
+
+        # PDF linklerini topla
+        pdf_listesi = []
+        gorulen_pdf = set()
+        for a in soup.find_all("a", href=True):
+            href = a["href"]
+            # .pdf uzantılı veya href'te pdf geçen linkler
+            if href.lower().endswith(".pdf") or "pdf" in href.lower():
+                tam_url = urljoin(url, href)
+                if tam_url in gorulen_pdf:
+                    continue
+                gorulen_pdf.add(tam_url)
+                ad = a.get_text(strip=True) or href.split("/")[-1]
+                icerik = pdf_icerigi_cek(tam_url)
+                pdf_listesi.append({"ad": ad, "url": tam_url, "icerik": icerik})
+
+        # Sayfa metni
         for tag in soup(["script","style","nav","header","footer"]):
             tag.decompose()
-        satirlar = [s for s in soup.get_text("\n",strip=True).splitlines() if s.strip()]
-        return "\n".join(satirlar[:300])
+        satirlar = [s for s in soup.get_text("\n", strip=True).splitlines() if s.strip()]
+        metin = "\n".join(satirlar[:400])
+
+        return metin, pdf_listesi
+
     except Exception as e:
-        return f"İçerik alınamadı: {e}"
+        return f"İçerik alınamadı: {e}", []
 
 # ─────────────────────────────────────────────
 # GROQ AI
 # ─────────────────────────────────────────────
-def groq_ozet(baslik, icerik):
+def groq_ozet(baslik, icerik, pdf_listesi=None):
     su_an   = time.time()
     bekleme = RATE_LIMIT_SANIYE - (su_an - st.session_state.get("son_groq_istegi", 0))
     if bekleme > 0:
@@ -195,28 +241,47 @@ def groq_ozet(baslik, icerik):
     try:
         client = Groq(api_key=GROQ_API_KEY)
         sistem = """Sen Türkiye kamu kurumlarındaki personel alım ilanlarını analiz eden bir uzmansın.
-Görevin: Verilen ilan metnini okuyarak YALNIZCA metinde açıkça yazan bilgileri çıkarmak.
-Metinde olmayan hiçbir bilgiyi UYDURMAYACAKSIN (halüsinasyon yasak).
-Yanıtını Türkçe ver ve şu başlıkları kullan:
+
+Görevin: Verilen ilan metnini AYNEN ve EKSİKSİZ analiz etmek.
+
+KRİTİK KURALLAR:
+1. Metinde geçen TÜM sayısal ve spesifik bilgileri yaz: ölçüler (mm, cm), adetler, saatler, tarihler, adresler, banka adları, şube adları, form adları vb.
+2. Listeler varsa (örn: istenen belgeler) HER maddeyi ayrı satırda numaralı yaz, hiçbirini atlama.
+3. Metinde OLMAYAN hiçbir bilgiyi uydurma.
+4. İlanda PDF dosyaları varsa bunları da ⬇️ **Ekli Dosyalar** başlığı altında listele.
+5. Yanıtını Türkçe ver.
+
+Şu başlıkları kullan (bilgi yoksa o başlığı atla):
 
 📋 **İlan Özeti**
 🎯 **Aranan Pozisyon(lar)**
 🔢 **Alınacak Kişi Sayısı**
 📚 **Aranan Şartlar / Nitelikler**
+📋 **İstenen Belgeler** (her belgeyi numaralı liste olarak, tüm detaylarıyla)
 📅 **Önemli Tarihler**
 📝 **Başvuru Bilgileri**
 ⚠️ **Dikkat Edilmesi Gerekenler**
+⬇️ **Ekli Dosyalar** (varsa)"""
 
-Eğer bir başlık için metinde bilgi yoksa o başlığı atla."""
+        # PDF içeriklerini ana metne ekle
+        ek_metin = ""
+        if pdf_listesi:
+            ek_metin = "\n\n--- EKLİ PDF DOSYALARI ---\n"
+            for p in pdf_listesi:
+                ek_metin += f"\nDosya Adı: {p['ad']}\nURL: {p['url']}\n"
+                if p["icerik"]:
+                    ek_metin += f"İçerik:\n{p['icerik'][:1500]}\n"
+                else:
+                    ek_metin += "(İçerik okunamadı)\n"
 
         yanit = client.chat.completions.create(
             model=GROQ_MODEL,
             messages=[
                 {"role":"system","content":sistem},
-                {"role":"user","content":f"İlan Başlığı: {baslik}\n\nİlan İçeriği:\n{icerik}"},
+                {"role":"user","content":f"İlan Başlığı: {baslik}\n\nİlan İçeriği:\n{icerik}{ek_metin}"},
             ],
             temperature=0.1,
-            max_tokens=1500,
+            max_tokens=2500,
         )
         st.session_state["son_groq_istegi"] = time.time()
         return yanit.choices[0].message.content
@@ -238,6 +303,21 @@ def favori_toggle(link):
 
 def favori_mi(link):
     return link in st.session_state.get("favoriler", set())
+
+# ─────────────────────────────────────────────
+# AKILLI ARAMA
+# ─────────────────────────────────────────────
+def arama_eslesiyor(arama_metni, baslik):
+    """
+    Çok kelimeli AND mantığı: tüm kelimeler başlıkta geçmeli.
+    Türkçe karakterler normalize edilir.
+    Örn: "uzman yardimci 2025" → her kelime başlıkta olmalı.
+    """
+    if not arama_metni:
+        return True
+    norm_baslik = normalize(baslik)
+    kelimeler = normalize(arama_metni).split()
+    return all(k in norm_baslik for k in kelimeler)
 
 # ─────────────────────────────────────────────
 # CSS
@@ -280,6 +360,18 @@ CSS = """
     color: #ffd700;
     margin-left: 6px;
 }
+.pdf-kutu {
+    background: #161b2e;
+    border: 1px solid #2d3555;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 6px;
+}
+.arama-ipucu {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 2px;
+}
 </style>
 """
 
@@ -303,11 +395,15 @@ def ilan_karti_goster(d, idx):
         st.link_button("🔗 İlana Git", url=d["link"], use_container_width=True)
 
     with col2:
-        anahtar = f"ozet_{idx}"
+        anahtar       = f"ozet_{idx}"
+        pdf_anahtar   = f"pdfler_{idx}"
         if st.button("🤖 Detay Getir (AI Özet)", key=f"btn_{idx}", use_container_width=True):
-            with st.spinner("Okunuyor ve özetleniyor..."):
-                icerik = ilan_icerik_cek(d["link"])
-                ozet   = groq_ozet(d["baslik"], icerik)
+            with st.spinner("📖 Sayfa okunuyor, PDF'ler kontrol ediliyor..."):
+                icerik, pdf_listesi = ilan_icerik_cek(d["link"])
+                st.session_state[pdf_anahtar] = pdf_listesi
+
+            with st.spinner("🤖 AI ile özetleniyor..."):
+                ozet = groq_ozet(d["baslik"], icerik, pdf_listesi)
                 st.session_state[anahtar] = ozet
 
     with col3:
@@ -315,12 +411,31 @@ def ilan_karti_goster(d, idx):
             favori_toggle(d["link"])
             st.rerun()
 
-    # AI Özet — st.markdown kullanıyoruz, HTML div değil
+    # AI Özet
     if anahtar in st.session_state:
         with st.expander("📄 AI Özeti", expanded=True):
             st.markdown(st.session_state[anahtar])
+
+            # PDF İndirme Butonları
+            pdf_listesi = st.session_state.get(pdf_anahtar, [])
+            if pdf_listesi:
+                st.markdown("---")
+                st.markdown("**📎 Ekli PDF Dosyaları:**")
+                for pdf in pdf_listesi:
+                    col_pdf1, col_pdf2 = st.columns([3, 1])
+                    with col_pdf1:
+                        st.markdown(f"📄 `{pdf['ad']}`")
+                    with col_pdf2:
+                        st.link_button(
+                            "⬇️ İndir",
+                            url=pdf["url"],
+                            use_container_width=True,
+                        )
+
             if st.button("✖️ Kapat", key=f"kapat_{idx}"):
                 del st.session_state[anahtar]
+                if pdf_anahtar in st.session_state:
+                    del st.session_state[pdf_anahtar]
                 st.rerun()
 
     st.divider()
@@ -332,7 +447,7 @@ def sidebar_filtre(tum_yillar):
     st.sidebar.title("🏛️ Milli Saraylar\nİlan Takip")
     st.sidebar.markdown("---")
 
-    # Yıl modu — 3 seçenek
+    # Yıl modu
     st.sidebar.subheader("📅 Yıl Filtresi")
     mod = st.sidebar.radio(
         "Göster:",
@@ -340,7 +455,6 @@ def sidebar_filtre(tum_yillar):
         index=0,
     )
 
-    # Tüm modda ek yıl seçimi
     secili_yillar = []
     if mod == "Filtresiz (Tümü)" and tum_yillar:
         secili_yillar = st.sidebar.multiselect(
@@ -360,8 +474,17 @@ def sidebar_filtre(tum_yillar):
     secili_kategori = st.sidebar.selectbox("Kategori:", kategoriler)
 
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🔤 Arama")
-    arama = st.sidebar.text_input("Başlıkta ara:", placeholder="örn: itfaiyeci")
+    st.sidebar.subheader("🔤 Akıllı Arama")
+    arama = st.sidebar.text_input(
+        "Başlıkta ara:",
+        placeholder="örn: uzman yardimci istanbul",
+    )
+    # İpucu
+    st.sidebar.markdown(
+        "<div class='arama-ipucu'>💡 Birden fazla kelime yazabilirsin — tümü eşleşmeli (AND). "
+        "Türkçe karakter fark etmez: 'sef' → 'şef' bulur.</div>",
+        unsafe_allow_html=True,
+    )
 
     # Favori filtresi
     st.sidebar.markdown("---")
@@ -369,11 +492,69 @@ def sidebar_filtre(tum_yillar):
         f"⭐ Sadece Favoriler ({len(st.session_state.get('favoriler', set()))})"
     )
 
+    # Kullanma Kılavuzu
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("📖 Nasıl Kullanılır?", expanded=False):
+        st.sidebar.markdown("""
+**🔄 Verileri Güncelle** *(sağ üst köşe)*
+Siteyi anlık tarar, yeni ilanları çeker.
+Normalde her gün otomatik güncellenir ama
+"yeni bir şey çıktı mu acaba" dersen buna bas.
+
+---
+
+**📅 Yıl Filtresi**
+İlanları yıla göre ayıklar.
+- *2026 ve Sonrası* → En güncel ilanlar
+- *2025 ve Öncesi* → Geçmiş ilanlar
+- *Filtresiz* → Hepsi birden
+  (çok fazla olur ama sen bilirsin 😄)
+
+---
+
+**🔎 Kategori**
+İlanları türüne göre filtreler.
+Mesela sadece *Nihai Sonuç* görmek istiyorsan
+buradan seçersin. İsmin listede var mı
+bakmak için ideal.
+
+---
+
+**🔤 Akıllı Arama**
+Başlıkta geçen kelimeye göre arama yapar.
+Birden fazla kelime yazabilirsin, hepsi
+eşleşmeli (AND mantığı).
+Türkçe karakter takılma: "sef" yazsan "şef"
+de bulur, "uzman yardimci" yazsan
+"uzman yardımcısı" da çıkar.
+
+---
+
+**⭐ Favoriler**
+Takip etmek istediğin ilanın yanındaki
+☆ Favori butonuna basarsan yıldızlanır ⭐
+Sonra "Sadece Favoriler" kutucuğunu
+işaretleyince sadece onları görürsün.
+
+---
+
+**🤖 Detay Getir (AI Özet)**
+Her ilanın altındaki bu butona basınca:
+1. İlan sayfası otomatik açılıp okunur
+2. Varsa ekli PDF'ler de taranır
+3. Yapay zeka her şeyi özetler:
+   kaç kişi alınıyor, hangi belgeler lazım vs.
+4. PDF varsa altında indirme butonu çıkar
+
+*Not: Her özet birkaç saniyelik bekleme
+yapar, yapay zeka bunalmasın diye 🙂*
+        """)
+
     return {
         "mod"             : mod,
         "secili_yillar"   : secili_yillar,
         "secili_kategori" : secili_kategori,
-        "arama"           : arama.strip().lower(),
+        "arama"           : arama.strip(),
         "sadece_favori"   : sadece_favori,
     }
 
@@ -398,8 +579,9 @@ def ilan_filtrele(duyurular, filtre):
     if filtre["secili_kategori"] != "Tümü":
         sonuc = [d for d in sonuc if filtre["secili_kategori"] in d["kategori"]]
 
+    # Akıllı çok kelimeli arama
     if filtre["arama"]:
-        sonuc = [d for d in sonuc if filtre["arama"] in normalize(d["baslik"])]
+        sonuc = [d for d in sonuc if arama_eslesiyor(filtre["arama"], d["baslik"])]
 
     return sonuc
 
@@ -420,7 +602,11 @@ def main():
         if k not in st.session_state:
             st.session_state[k] = v
 
-    # ── Başlık + Güncelle butonu ──
+    # PyPDF2 uyarısı
+    if not PDF_DESTEKLI:
+        st.info("ℹ️ PDF içerikleri için `pip install PyPDF2` kurabilirsin. PDF linkleri yine de gösterilir.")
+
+    # Başlık + Güncelle
     col_baslik, col_btn = st.columns([5, 1])
     with col_baslik:
         st.title("🏛️ Milli Saraylar Personel Alım Duyuruları")
@@ -431,7 +617,6 @@ def main():
             veri_guncelle()
             st.success("Güncellendi!")
 
-    # ── Veri yükle (günlük otomatik) ──
     duyurular = veri_yukle()
 
     son_guncelleme = st.session_state.get("son_guncelleme")
@@ -444,11 +629,10 @@ def main():
 
     tum_yillar = sorted({d["yil"] for d in duyurular if d["yil"]}, reverse=True)
 
-    # ── Sidebar ──
-    filtre  = sidebar_filtre(tum_yillar)
+    filtre   = sidebar_filtre(tum_yillar)
     filtreli = ilan_filtrele(duyurular, filtre)
 
-    # ── İstatistik ──
+    # İstatistik
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("📋 Toplam İlan", len(duyurular))
     c2.metric("🔍 Gösterilen", len(filtreli))
@@ -461,7 +645,7 @@ def main():
         st.info("Seçilen filtrelere uygun ilan bulunamadı.")
         return
 
-    # ── Yıla göre grupla ──
+    # Yıla göre grupla
     gruplar = defaultdict(list)
     for d in filtreli:
         gruplar[d["yil"] or 0].append(d)
