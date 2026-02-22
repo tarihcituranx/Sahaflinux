@@ -69,37 +69,58 @@ HTTP_HEADERS = {
 
 def http_get(url: str, max_deneme: int = 3) -> requests.Response:
     """
-    403/429'a karşı retry + session cookie destekli GET.
-    Önce session aç, çerezleri al, sonra asıl isteği at.
+    Önce API Ninjas scraper ile dener (devlet sitesi engelini aşar).
+    PDF URL'leri için (binary içerik) doğrudan requests kullanır.
     """
+    import json as _json
+
+    api_ninjas_key = st.secrets.get("API_NINJAS_KEY", "")
+    is_pdf = url.lower().endswith(".pdf") or "getfile" in url.lower()
+
+    # API Ninjas ile dene (HTML sayfaları için)
+    if api_ninjas_key and not is_pdf:
+        for deneme in range(max_deneme):
+            try:
+                r = requests.get(
+                    "https://api.api-ninjas.com/v1/webscraper",
+                    headers={"X-Api-Key": api_ninjas_key},
+                    params={"url": url},
+                    timeout=30,
+                )
+                if r.status_code == 200:
+                    class FakeResponse:
+                        def __init__(self, raw: str):
+                            try:
+                                parsed   = _json.loads(raw)
+                                self.text = parsed.get("data", raw)
+                            except Exception:
+                                self.text = raw
+                            self.content     = self.text.encode("utf-8")
+                            self.status_code = 200
+                            self._h          = {"Content-Type": "text/html; charset=utf-8"}
+                        def raise_for_status(self): pass
+                        @property
+                        def headers(self): return self._h
+                    return FakeResponse(r.text)
+                if r.status_code == 429:
+                    time.sleep(5 * (deneme + 1))
+                    continue
+            except Exception:
+                if deneme == max_deneme - 1:
+                    break
+                time.sleep(2)
+
+    # Fallback: doğrudan istek (PDF veya key yoksa)
     session = requests.Session()
     session.headers.update(HTTP_HEADERS)
-
     for deneme in range(max_deneme):
         try:
-            # İlk denemede ana sayfaya gidip çerez al
-            if deneme == 0 and url != ANASAYFA_URL:
-                try:
-                    session.get(ANASAYFA_URL, verify=False, timeout=10)
-                except Exception:
-                    pass
-
             r = session.get(url, verify=False, timeout=20)
-
-            if r.status_code == 403:
-                time.sleep(2 * (deneme + 1))
+            if r.status_code in (403, 429):
+                time.sleep(3 * (deneme + 1))
                 continue
-            if r.status_code == 429:
-                time.sleep(5 * (deneme + 1))
-                continue
-
             r.raise_for_status()
             return r
-
-        except requests.exceptions.HTTPError:
-            if deneme == max_deneme - 1:
-                raise
-            time.sleep(2)
         except Exception:
             if deneme == max_deneme - 1:
                 raise
