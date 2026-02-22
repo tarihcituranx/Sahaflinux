@@ -16,3 +16,5 @@ lxml
 curl_cffi
 zenrows
 deep-translator
+groq
+urllib3
