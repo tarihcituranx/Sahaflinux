@@ -270,10 +270,11 @@ def ilan_icerik_cek(url):
         for a in icerik_alani.find_all("a", href=True):
             href = a["href"]
 
-            # Sadece .pdf uzantılı ya da açık pdf/dosya yolu olan linkler
-            if not (href.lower().endswith(".pdf")
-                    or re.search(r"GetFile|Download|Dosya", href)
-                    or re.search(r"GetFile|Download|Dosya", href)):
+            # .pdf uzantılı veya site içi GetFile/dosya yolları
+            href_lower = href.lower()
+            if not (href_lower.endswith(".pdf")
+                    or "getfile" in href_lower
+                    or ("dosya" in href_lower and "millisaraylar" in urljoin(url, href))):
                 continue
 
             # Nav / header / footer içindeyse atla
@@ -500,27 +501,30 @@ def ilan_karti_goster(d, idx):
         with st.expander("📄 AI Özeti", expanded=True):
             st.markdown(st.session_state[anahtar])
 
-            # PDF İndirme Butonları
-            pdf_listesi = st.session_state.get(pdf_anahtar, [])
-            if pdf_listesi:
-                st.markdown("---")
-                st.markdown("**📎 Ekli PDF Dosyaları:**")
-                for pdf in pdf_listesi:
-                    col_pdf1, col_pdf2 = st.columns([3, 1])
-                    with col_pdf1:
-                        st.markdown(f"📄 `{pdf['ad']}`")
-                    with col_pdf2:
-                        st.link_button(
-                            "⬇️ İndir",
-                            url=pdf["url"],
-                            use_container_width=True,
-                        )
+        # ── PDF İndirme Butonları (expander dışında, her zaman görünür) ──
+        pdf_listesi = st.session_state.get(pdf_anahtar, [])
+        if pdf_listesi:
+            st.markdown("**📎 Ekli Belgeler — İndir:**")
+            for pdf in pdf_listesi:
+                col_ad, col_btn = st.columns([4, 1])
+                with col_ad:
+                    st.markdown(
+                        f"<div style='padding:6px 0; font-size:14px;'>📄 {pdf['ad']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with col_btn:
+                    st.link_button(
+                        "⬇️ İndir",
+                        url=pdf["url"],
+                        use_container_width=True,
+                    )
+            st.markdown("")  # boşluk
 
-            if st.button("✖️ Kapat", key=f"kapat_{idx}"):
-                del st.session_state[anahtar]
-                if pdf_anahtar in st.session_state:
-                    del st.session_state[pdf_anahtar]
-                st.rerun()
+        if st.button("✖️ Kapat", key=f"kapat_{idx}"):
+            del st.session_state[anahtar]
+            if pdf_anahtar in st.session_state:
+                del st.session_state[pdf_anahtar]
+            st.rerun()
 
     st.divider()
 
