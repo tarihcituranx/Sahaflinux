@@ -11,6 +11,19 @@ import streamlit as st
 from bs4 import BeautifulSoup
 from groq import Groq
 
+# Bot koruması aşma katmanları
+try:
+    import cloudscraper
+    CLOUDSCRAPER_VAR = True
+except ImportError:
+    CLOUDSCRAPER_VAR = False
+
+try:
+    import curl_cffi.requests as curl_requests
+    CURL_CFFI_VAR = True
+except ImportError:
+    CURL_CFFI_VAR = False
+
 try:
     import PyPDF2
     PDF_DESTEKLI = True
@@ -60,19 +73,120 @@ def normalize(m):
 def simdi_tr():
     return datetime.now(TZ_TURKIYE)
 
-def session_olustur():
-    """ASP.NET session cookie alır."""
+# ─────────────────────────────────────────────
+# BOT KORUMASI AŞMA — KATMANLI YAKLAŞIM
+# ─────────────────────────────────────────────
+
+TARAYICI_PROFILLERI = [
+    # Chrome Android (kullanıcının gerçek tarayıcısı)
+    {
+        "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/145.0.0.0 Mobile Safari/537.36",
+        "sec-ch-ua": '"Not:A-Brand";v="99", "Google Chrome";v="145", "Chromium";v="145"',
+        "sec-ch-ua-mobile": "?1",
+        "sec-ch-ua-platform": '"Android"',
+    },
+    # Chrome Windows
+    {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "sec-ch-ua": '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+    },
+    # Firefox
+    {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) "
+                      "Gecko/20100101 Firefox/123.0",
+    },
+]
+
+ORTAK_HEADERS = {
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
+              "image/avif,image/webp,image/apng,*/*;q=0.8",
+    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate, br",
+    "DNT": "1",
+    "Upgrade-Insecure-Requests": "1",
+    "Connection": "keep-alive",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+}
+
+def session_olustur_requests(profil_idx=0):
+    """Standart requests session — farklı tarayıcı profilleri dene."""
     s = requests.Session()
-    s.headers.update(HEADERS)
+    h = {**ORTAK_HEADERS, **TARAYICI_PROFILLERI[profil_idx % len(TARAYICI_PROFILLERI)]}
+    s.headers.update(h)
+    urllib3.disable_warnings()
     try:
-        s.get(ANASAYFA_URL, verify=False, timeout=15)
+        # Önce GET ile session cookie al
+        r = s.get(ANASAYFA_URL, verify=False, timeout=15, allow_redirects=True)
+        if r.status_code == 200:
+            return s, True
     except Exception:
         pass
-    return s
+    return s, False
+
+def session_olustur_cloudscraper():
+    """cloudscraper ile Cloudflare bypass."""
+    if not CLOUDSCRAPER_VAR:
+        return None, False
+    try:
+        s = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "android", "mobile": True}
+        )
+        r = s.get(ANASAYFA_URL, timeout=20)
+        if r.status_code == 200:
+            return s, True
+    except Exception:
+        pass
+    return None, False
+
+def session_olustur_curl():
+    """curl_cffi ile TLS parmak izi taklit."""
+    if not CURL_CFFI_VAR:
+        return None, False
+    try:
+        s = curl_requests.Session(impersonate="chrome110")
+        r = s.get(ANASAYFA_URL, timeout=20)
+        if r.status_code == 200:
+            return s, True
+    except Exception:
+        pass
+    return None, False
+
+def session_olustur():
+    """
+    Tüm yöntemleri sırayla dener, ilk çalışanı döner.
+    Döner: (session, tip_str)
+    """
+    # 1. cloudscraper
+    s, ok = session_olustur_cloudscraper()
+    if ok:
+        return s, "cloudscraper"
+
+    # 2. curl_cffi
+    s, ok = session_olustur_curl()
+    if ok:
+        return s, "curl_cffi"
+
+    # 3. requests — farklı profiller
+    for i in range(len(TARAYICI_PROFILLERI)):
+        s, ok = session_olustur_requests(i)
+        if ok:
+            return s, f"requests (profil {i+1})"
+
+    # 4. Hiçbiri tutmazsa son profil ile devam et (hata mesajı gösterilecek)
+    s, _ = session_olustur_requests(0)
+    return s, "requests (fallback)"
 
 def get_session():
     if "http_session" not in st.session_state:
-        st.session_state["http_session"] = session_olustur()
+        with st.spinner("🔐 Bağlantı kuruluyor..."):
+            s, tip = session_olustur()
+            st.session_state["http_session"] = s
+            st.session_state["session_tip"]  = tip
     return st.session_state["http_session"]
 
 # ─────────────────────────────────────────────
@@ -253,9 +367,29 @@ def ilanları_cek_alternatif(soup):
 
 def veri_guncelle():
     with st.spinner("🔄 İlanlar güncelleniyor..."):
-        # Session yenile
-        st.session_state["http_session"] = session_olustur()
+        # Session yenile — yeni bağlantı kur
+        if "http_session" in st.session_state:
+            del st.session_state["http_session"]
+        get_session()  # yeni session oluştur
+        tip = st.session_state.get("session_tip", "?")
         ilanlar = ilanları_cek_raw()
+
+    # Bağlantı tipini göster
+    if ilanlar:
+        st.success(f"✅ {len(ilanlar)} ilan çekildi · Bağlantı: `{tip}`")
+    else:
+        # Kurulum talimatı göster
+        st.warning(f"""
+⚠️ İlan çekilemedi · Bağlantı tipi: `{tip}`
+
+**Daha güçlü bot koruması aşma için şunları kur:**
+```
+pip install cloudscraper
+pip install curl-cffi
+```
+Kurulduktan sonra uygulamayı yeniden başlat ve tekrar dene.
+""")
+
     st.session_state["ilanlar"]        = ilanlar
     st.session_state["son_guncelleme"] = simdi_tr()
     return ilanlar
