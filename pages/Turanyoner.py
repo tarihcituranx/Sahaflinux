@@ -207,35 +207,91 @@ def fetch_questions(amount=15, category=None, difficulty=None):
     except Exception as e:
         st.error(f"Soru yuklenirken hata: {e}"); return []
 
+def _extract_json(raw: str):
+    """JSON bloğunu güvenli şekilde ayıklar."""
+    raw = raw.strip()
+    # ```json ... ``` veya ``` ... ``` bloğu
+    if "```" in raw:
+        parts = raw.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("[") or part.startswith("{"):
+                return part
+    # Direkt JSON
+    start = raw.find("[")
+    end   = raw.rfind("]") + 1
+    if start != -1 and end > start:
+        return raw[start:end]
+    return raw
+
+def _translate_batch(client, batch: list) -> dict:
+    """Bir grup soruyu çevirir, {id: translated_item} döner."""
+    system = (
+        "Sen bir Türkçe çevirmen yapay zekasısın. "
+        "Sana verilen JSON dizisindeki bilgi yarışması sorularını ve şıklarını Türkçeye çeviriyorsun. "
+        "Özel isimler, yer adları, marka adları ve bilimsel terimler (element adları, türler vb.) orijinal haliyle kalmalı. "
+        "Çeviri doğal ve akıcı Türkçe olmalı. "
+        "SADECE geçerli bir JSON dizisi döndür, başka hiçbir şey yazma."
+    )
+    user = (
+        "Aşağıdaki JSON dizisini çevir. Her öğedeki 'question', 'correct' ve 'options' alanlarını Türkçeye çevir. "
+        "'id' alanını kesinlikle değiştirme. Sadece JSON döndür:\n\n"
+        + json.dumps(batch, ensure_ascii=False)
+    )
+    resp = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
+        max_tokens=3000,
+        temperature=0.1,
+    )
+    raw = resp.choices[0].message.content
+    parsed = json.loads(_extract_json(raw))
+    return {item["id"]: item for item in parsed}
+
 def translate_questions(questions, api_key):
-    if not api_key: return questions
+    """Soruları 5'erli gruplar halinde Türkçeye çevirir."""
+    if not api_key:
+        return questions
     try:
         from groq import Groq
         client = Groq(api_key=api_key)
-        payload = [{"id": i, "question": q["question"], "correct": q["correct"], "options": q["options"]}
-                   for i, q in enumerate(questions)]
-        prompt = (f"Asagidaki bilgi yarismasi sorularini ve sik seceneklerini Turkceye cevir.\n"
-                  f"Kurallar: Dogal akici Turkce kullan. Ozel isimler/markalar/bilimsel terimler orijinal kalsin. "
-                  f"SADECE JSON don dur, baska hicbir sey yazma. id degistirme.\n\n"
-                  f"JSON:\n{json.dumps(payload, ensure_ascii=False)}")
-        resp = client.chat.completions.create(model="llama-3.3-70b-versatile",
-            messages=[{"role":"user","content":prompt}], max_tokens=4096, temperature=0.1)
-        raw = resp.choices[0].message.content.strip()
-        if "```" in raw:
-            raw = raw.split("```")[1]
-            if raw.startswith("json"): raw = raw[4:]
-        tr_map = {item["id"]: item for item in json.loads(raw.strip())}
+
+        payload = [
+            {"id": i, "question": q["question"], "correct": q["correct"], "options": q["options"]}
+            for i, q in enumerate(questions)
+        ]
+
+        # 5'erli batch — token limitini aşmamak için
+        BATCH = 5
+        tr_map = {}
+        for start in range(0, len(payload), BATCH):
+            batch = payload[start:start+BATCH]
+            try:
+                tr_map.update(_translate_batch(client, batch))
+            except Exception as batch_err:
+                # Bu batch başarısız olduysa orijinal kalsın, devam et
+                st.toast(f"Batch {start//BATCH+1} çevrilemedi, orijinal kullanılıyor.")
+
+        # Çevirileri uygula
         for i, q in enumerate(questions):
             if i in tr_map:
                 t = tr_map[i]
                 q["question"] = t.get("question", q["question"])
-                new_opts = t.get("options", q["options"])
+                new_opts    = t.get("options", q["options"])
                 new_correct = t.get("correct", q["correct"])
                 if len(new_opts) == len(q["options"]):
-                    q["options"] = new_opts; q["correct"] = new_correct
+                    q["options"]  = new_opts
+                    q["correct"]  = new_correct
         return questions
+
     except Exception as e:
-        st.warning(f"Ceviri hatasi, sorular Ingilizce gosterilecek: {e}"); return questions
+        st.warning(f"Çeviri başlatılamadı: {e}")
+        return questions
 
 def groq_phone_friend(question, options, api_key):
     try:
