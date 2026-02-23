@@ -333,6 +333,53 @@ PRIZE_AMOUNTS = [
 
 GUARANTEED_LEVELS = {2: 3_000, 6: 20_000, 10: 500_000}  # 0-tabanlı index
 
+# Süre limitleri (saniye) — baraj seviyelerine göre
+TIME_LIMITS = {
+    range(0, 5):  45,   # Sorular 1-5
+    range(5, 10): 35,   # Sorular 6-10
+    range(10, 15): 25,  # Sorular 11-15
+}
+
+def get_time_limit(q_index: int) -> int:
+    for rng, limit in TIME_LIMITS.items():
+        if q_index in rng:
+            return limit
+    return 30
+
+# İngilizce kategori → Türkçe karşılığı
+CATEGORY_TR = {
+    "General Knowledge": "Genel Kültür",
+    "Entertainment: Books": "Eğlence: Kitaplar",
+    "Entertainment: Film": "Eğlence: Filmler",
+    "Entertainment: Music": "Eğlence: Müzik",
+    "Entertainment: Musicals & Theatres": "Eğlence: Müzikal & Tiyatro",
+    "Entertainment: Television": "Eğlence: Televizyon",
+    "Entertainment: Video Games": "Eğlence: Video Oyunları",
+    "Entertainment: Board Games": "Eğlence: Kutu Oyunları",
+    "Science & Nature": "Bilim & Doğa",
+    "Science: Computers": "Bilim: Bilgisayar",
+    "Science: Mathematics": "Bilim: Matematik",
+    "Science: Gadgets": "Bilim: Teknoloji",
+    "Mythology": "Mitoloji",
+    "Sports": "Spor",
+    "Geography": "Coğrafya",
+    "History": "Tarih",
+    "Politics": "Siyaset",
+    "Art": "Sanat",
+    "Celebrities": "Ünlüler",
+    "Animals": "Hayvanlar",
+    "Vehicles": "Taşıtlar",
+    "Entertainment: Comics": "Eğlence: Çizgi Roman",
+    "Entertainment: Japanese Anime & Manga": "Eğlence: Anime & Manga",
+    "Entertainment: Cartoon & Animations": "Eğlence: Çizgi Film",
+}
+
+HOST_COMMENTS_TIMEOUT = [
+    "Süre doldu! Turan Kaya saatine bakıyor... Maalesef yetişemediniz!",
+    "Zaman bitti! Turan Kaya: 'Saniyeler çok hızlı geçti!'",
+    "Süre tamam! Turan Kaya sahnede donakaldı...",
+]
+
 CATEGORIES = {
     "Rastgele": None,
     "Genel Bilgi": 9,
@@ -409,6 +456,64 @@ def get_guaranteed_prize(current_index: int) -> str:
     if earned == 0:
         return "0 TL"
     return format_prize(earned)
+
+
+def translate_questions_with_groq(questions: list, api_key: str) -> list:
+    """Tüm soruları ve şıkları tek bir Groq çağrısıyla Türkçeye çevirir."""
+    if not api_key:
+        return questions
+    try:
+        from groq import Groq
+        client = Groq(api_key=api_key)
+
+        payload = []
+        for i, q in enumerate(questions):
+            payload.append({
+                "id": i,
+                "question": q["question"],
+                "correct": q["correct"],
+                "options": q["options"],
+            })
+
+        prompt = f"""Asagidaki bilgi yarismasi sorularini ve şik seçeneklerini Türkçeye çevir.
+Kurallar:
+- Her soruyu ve şıkkı dogal, akici Türkçeye çevir
+- Özel isimler, yer adlari, marka adlari, bilimsel terimler orijinal halleriyle kalsin
+- Sadece JSON döndür, baska hiçbir şey yazma
+- Aynı JSON yapisini koru, sadece question correct ve options alanlarini çevir
+- id alanini degistirme
+
+JSON:
+{json.dumps(payload, ensure_ascii=False)}"""
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=4096,
+            temperature=0.1,
+        )
+
+        raw = response.choices[0].message.content.strip()
+        if "```" in raw:
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        translated = json.loads(raw)
+
+        translated_map = {item["id"]: item for item in translated}
+        for i, q in enumerate(questions):
+            if i in translated_map:
+                t = translated_map[i]
+                q["question"] = t.get("question", q["question"])
+                new_correct = t.get("correct", q["correct"])
+                new_options = t.get("options", q["options"])
+                if len(new_options) == len(q["options"]):
+                    q["options"] = new_options
+                    q["correct"] = new_correct
+        return questions
+    except Exception as e:
+        st.warning(f"Çeviri hatasi, sorular Ingilizce gösterilecek: {e}")
+        return questions
 
 
 def fetch_questions(amount=15, category=None, difficulty=None):
@@ -528,6 +633,8 @@ def init_state():
         "audience_used_this_q": False,
         "phone_used_this_q": False,
         "groq_key": "",
+        "q_start_time": 0.0,
+        "timer_q_index": -1,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -637,6 +744,9 @@ if ss["phase"] == "setup":
                     category=CATEGORIES[cat_choice],
                     difficulty=DIFFICULTY_MAP[diff_choice],
                 )
+            if questions:
+                with st.spinner("Sorular Türkçeye çevriliyor... (Groq çalışiyor)"):
+                    questions = translate_questions_with_groq(questions, ss["groq_key"])
             if len(questions) < 5:
                 st.error("Yeterli soru yuklenemedi. Lutfen farkli bir kategori veya zorluk secin.")
             else:
@@ -678,6 +788,24 @@ elif ss["phase"] == "playing":
     q_data = ss["questions"][ss["q_index"]]
     current_options = q_data["options"][:]
 
+    # ── Zamanlayici baslat / sıfırla
+    if ss["timer_q_index"] != ss["q_index"]:
+        ss["q_start_time"] = time.time()
+        ss["timer_q_index"] = ss["q_index"]
+
+    time_limit = get_time_limit(ss["q_index"])
+    elapsed = time.time() - ss["q_start_time"]
+    remaining = max(0, time_limit - int(elapsed))
+
+    # Süre doldu mu?
+    if elapsed >= time_limit and ss["phase"] == "playing":
+        ss["last_result"] = "timeout"
+        ss["host_message"] = random.choice(HOST_COMMENTS_TIMEOUT)
+        ss["correct_answer_reveal"] = q_data["correct"]
+        play_sound_js("wrong")
+        ss["phase"] = "result"
+        st.rerun()
+
     # ── Sunucu Mesaji
     if ss["host_message"]:
         st.markdown(f"""
@@ -688,6 +816,30 @@ elif ss["phase"] == "playing":
         """, unsafe_allow_html=True)
 
     # ── Joker Butonları
+    # ── Zamanlayici Gösterge
+    tier_label = "1-5. SORULAR (45s)" if ss["q_index"] < 5 else ("6-10. SORULAR (35s)" if ss["q_index"] < 10 else "11-15. SORULAR (25s)")
+    pct = remaining / time_limit * 100
+    bar_color = "#4caf50" if pct > 50 else ("#ff9800" if pct > 25 else "#f44336")
+    pulse_css = "animation: pulse-red 0.5s ease infinite;" if pct <= 20 else ""
+    st.markdown(f"""
+    <style>
+    @keyframes pulse-red {{
+        0%,100% {{ box-shadow: 0 0 8px {bar_color}; }}
+        50% {{ box-shadow: 0 0 22px {bar_color}, 0 0 40px rgba(244,67,54,0.4); }}
+    }}
+    </style>
+    <div style='margin: 0.5rem 0 1rem 0;'>
+        <div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;'>
+            <span style='font-family:Rajdhani,sans-serif; font-size:0.75rem; color:#666; letter-spacing:0.2em;'>{tier_label}</span>
+            <span style='font-family:Cinzel,serif; font-size:1.4rem; font-weight:700; color:{bar_color}; {pulse_css}'>{remaining}s</span>
+        </div>
+        <div style='width:100%; background:rgba(255,255,255,0.06); border-radius:8px; height:10px; overflow:hidden;'>
+            <div style='width:{pct:.1f}%; height:100%; background:linear-gradient(90deg, {bar_color}, #fff8); 
+                        border-radius:8px; transition:width 0.9s linear; {pulse_css}'></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
     j1, j2, j3, j4 = st.columns([1, 1, 1, 0.5])
 
     with j1:
@@ -768,7 +920,7 @@ elif ss["phase"] == "playing":
             {q_data['question']}
         </div>
         <div style='font-size:0.72rem; color:#445; margin-top:0.5rem; font-family:Rajdhani,sans-serif;'>
-            {q_data['category']}
+            {q_data['category']}{f" ({CATEGORY_TR[q_data['category']]})" if q_data['category'] in CATEGORY_TR else ""}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -842,6 +994,8 @@ elif ss["phase"] == "playing":
                                 ss["fifty_used_this_q"] = False
                                 ss["audience_used_this_q"] = False
                                 ss["phone_used_this_q"] = False
+                                ss["q_start_time"] = time.time()
+                                ss["timer_q_index"] = ss["q_index"]
                         else:
                             ss["last_result"] = "wrong"
                             ss["host_message"] = random.choice(HOST_COMMENTS_WRONG)
@@ -861,6 +1015,10 @@ elif ss["phase"] == "playing":
         </span>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Her saniye yenile (geri sayım için)
+    time.sleep(1)
+    st.rerun()
 
 
 # ─── SONUC EKRANI ─────────────────────────────────────────────────────────────
@@ -899,13 +1057,14 @@ elif ss["phase"] == "result":
             """, unsafe_allow_html=True)
             play_sound_js("correct")
 
-        elif ss["last_result"] == "wrong":
+        elif ss["last_result"] in ["wrong", "timeout"]:
             guaranteed = get_guaranteed_prize(ss["q_index"])
             reveal = ss.get("correct_answer_reveal", "")
+            wrong_msg = "Süre doldu! Zamanında yetişemediniz..." if ss["last_result"] == "timeout" else "Yanlış cevap! Üzgünüz..."
             st.markdown(f"""
             <div class='wrong-box'>
-                Yanlis cevap! Uzgunuz...<br>
-                <span style='font-size:0.85rem; color:#ccc;'>Dogru cevap: {reveal}</span>
+                {wrong_msg}<br>
+                <span style='font-size:0.85rem; color:#ccc;'>Doğru cevap: {reveal}</span>
             </div>
             """, unsafe_allow_html=True)
 
