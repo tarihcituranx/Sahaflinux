@@ -159,16 +159,16 @@ def build_page(data: dict, sel: str) -> str:
                 <div class="hc-unit">Gram Altın</div>
                 <div class="hc-price sm">{sel_sym} {nf(gram_p)}</div>
                 <div class="hc-label">1 gram · 24 ayar saf</div>
+ <div class="hero-card">
+                <div class="hc-unit">Çeyrek Altın</div>
+                <div class="hc-price sm">{sel_sym} {nf(quarter_g)}</div>
+                <div class="hc-label">~1.75 gram · 21 ayar</div>
+            </div>
             </div>
             <div class="hero-card">
                 <div class="hc-unit">Yarım Altın</div>
                 <div class="hc-price sm">{sel_sym} {nf(half_g)}</div>
                 <div class="hc-label">~3.50 gram · 21 ayar</div>
-            </div>
-            <div class="hero-card">
-                <div class="hc-unit">Çeyrek Altın</div>
-                <div class="hc-price sm">{sel_sym} {nf(quarter_g)}</div>
-                <div class="hc-label">~1.75 gram · 21 ayar</div>
             </div>
             <div class="hero-card">
                 <div class="hc-unit">Cumhuriyet Altını</div>
