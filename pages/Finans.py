@@ -154,7 +154,12 @@ def build_page(data: dict, sel: str) -> str:
     if sel == "TRY":
         try_cards = f"""
         <div class="section-title">Anlık Altın Fiyatı — Türkiye</div>
-        <div class="sub-grid">
+        <div class="sub-grid four">
+            <div class="hero-card primary">
+                <div class="hc-unit">Gram Altın</div>
+                <div class="hc-price sm">{sel_sym} {nf(gram_p)}</div>
+                <div class="hc-label">1 gram · 24 ayar saf</div>
+            </div>
             <div class="hero-card">
                 <div class="hc-unit">Yarım Altın</div>
                 <div class="hc-price sm">{sel_sym} {nf(half_g)}</div>
@@ -392,6 +397,95 @@ body {{
 .sc-item {{ display: flex; flex-direction: column; gap: 3px; }}
 .sc-label {{ font-family: 'DM Mono', monospace; font-size: 0.58rem; letter-spacing: 0.25em; color: rgba(180,190,210,0.5); text-transform: uppercase; }}
 .sc-val   {{ font-family: 'Playfair Display', serif; font-size: 1.15rem; font-weight: 700; color: var(--silver); }}
+
+/* ── 4'lü sub-grid ── */
+.sub-grid.four {{
+    grid-template-columns: repeat(4, 1fr);
+}}
+@media (max-width: 700px) {{
+    .sub-grid.four {{ grid-template-columns: repeat(2, 1fr); }}
+}}
+@media (max-width: 380px) {{
+    .sub-grid.four {{ grid-template-columns: 1fr; }}
+}}
+
+/* ── OKUNABİLİRLİK İYİLEŞTİRMELERİ ── */
+body {{
+    background: var(--dark);
+    color: #f0e8d4;
+    font-family: 'DM Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    line-height: 1.5;
+}}
+.hc-unit {{
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem; letter-spacing: 0.2em;
+    color: #c8a050; text-transform: uppercase; margin-bottom: 10px;
+    font-weight: 500;
+}}
+.hc-price {{
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    color: #fff8ee; line-height: 1.15;
+    word-break: break-all;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}}
+.hc-price.big {{
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+}}
+.hc-price.sm {{
+    font-size: clamp(1.2rem, 2.5vw, 1.7rem);
+}}
+.hc-label {{
+    font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-top: 6px;
+    font-weight: 400; letter-spacing: 0.02em;
+}}
+.section-title {{
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem; letter-spacing: 0.28em;
+    color: #c8a050; text-transform: uppercase;
+    margin: 24px 0 12px;
+    font-weight: 500;
+    opacity: 0.9;
+}}
+.rr-code {{ font-family: 'DM Mono', monospace; font-size: 0.72rem; color: #c8a050; letter-spacing: 0.12em; font-weight: 600; }}
+.rr-name {{ font-size: 0.65rem; color: rgba(255,255,255,0.45); margin-top: 2px; }}
+.rr-val  {{ font-family: 'DM Mono', monospace; font-size: 0.88rem; color: #f0e8d4; font-weight: 500; }}
+.rr-unit {{ font-size: 0.6rem; color: rgba(255,255,255,0.3); margin-top: 2px; }}
+.ti-code {{ color: #c8a050; letter-spacing: 0.1em; font-size: 0.63rem; font-weight: 500; }}
+.ti-val  {{ color: #f0e8d0; font-size: 0.7rem; }}
+.sc-label {{ font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.22em; color: rgba(180,195,215,0.6); text-transform: uppercase; }}
+.sc-val   {{ font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700; color: rgba(210,225,240,0.95); }}
+.logo {{
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    background: linear-gradient(135deg, #8a6010 0%, #d4a847 30%, #f0c96a 50%, #d4a847 70%, #8a6010 100%);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gold-sheen 5s ease infinite;
+    line-height: 1.1;
+}}
+.sub {{
+    font-family: 'DM Mono', monospace;
+    font-size: 0.67rem;
+    letter-spacing: 0.25em;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    margin-top: 8px;
+}}
+.footer {{
+    text-align: center; padding: 20px 16px;
+    font-family: 'DM Mono', monospace; font-size: 0.6rem;
+    color: rgba(200,160,80,0.35); letter-spacing: 0.18em;
+    border-top: 1px solid var(--border);
+    margin-top: 32px;
+}}
 .sc-sep   {{ color: rgba(180,190,210,0.15); font-size: 1.4rem; align-self: center; }}
 
 /* ── KUR TABLOSU ── */
