@@ -252,13 +252,61 @@ label { color: var(--gold) !important; font-family:'DM Mono',monospace !importan
 
 
 # ─── VERİ ÇEK ─────────────────────────────────────────────────────────────────
+import os, json as _json
+
+RATE_FILE  = "/tmp/finans_rate.json"
+RATE_LIMIT = 20          # dakikada max istek (tüm kullanıcılar toplamda)
+RATE_WINDOW = 60         # saniye
+
+def _check_rate() -> bool:
+    """Basit sunucu-geneli rate limit. True = izin var."""
+    now = time.time()
+    try:
+        data_rl = {}
+        if os.path.exists(RATE_FILE):
+            with open(RATE_FILE) as f:
+                data_rl = _json.load(f)
+        # Pencere dışındaki kayıtları temizle
+        hits = [t for t in data_rl.get("hits", []) if now - t < RATE_WINDOW]
+        if len(hits) >= RATE_LIMIT:
+            return False
+        hits.append(now)
+        with open(RATE_FILE, "w") as f:
+            _json.dump({"hits": hits}, f)
+        return True
+    except:
+        return True   # hata varsa izin ver
+
 @st.cache_data(ttl=60)
 def fetch_prices():
+    if not _check_rate():
+        return None   # rate limit aşıldı
     try:
         r = requests.get(API_URL, timeout=10)
         return r.json()
     except:
         return {}
+
+# Para sembolü → HTML entity (Streamlit render güvenliği)
+SYM_ENTITY = {
+    "₺": "&#8378;",  # TRY
+    "£": "&pound;",
+    "€": "&euro;",
+    "¥": "&yen;",
+    "₽": "&#8381;",  # RUB
+    "₹": "&#8377;",  # INR
+    "₨": "&#8360;",  # PKR
+    "﷼": "&#65020;", # SAR/QAR
+    "د.إ": "&#x62F;.&#x625;",
+    "د.ك": "&#x62F;.&#x643;",
+    "ر.ق": "&#x631;.&#x642;",
+    "$": "$", "A$": "A$", "C$": "C$", "R$": "R$", "Fr": "Fr",
+    "kr": "kr", "＄": "$",
+}
+
+def safe_sym(sym: str) -> str:
+    """Sembolü HTML-güvenli entity'e çevirir."""
+    return SYM_ENTITY.get(sym, sym)
 
 def fmt_price(val: float, symbol: str, decimals: int = 2) -> str:
     if val >= 1_000_000:
@@ -287,8 +335,20 @@ if "last_fetch" not in st.session_state:
 # ─── VERİYİ YÜKLE ─────────────────────────────────────────────────────────────
 data = fetch_prices()
 
+if data is None:
+    st.markdown("""
+    <div style='text-align:center;padding:80px 20px;font-family:DM Mono,monospace;'>
+        <div style='font-size:2rem;color:#d4a847;margin-bottom:12px;'>&#9203;</div>
+        <div style='color:#d4a847;font-size:0.85rem;letter-spacing:0.2em;'>RATE LIMIT</div>
+        <div style='color:rgba(255,255,255,0.4);font-size:0.75rem;margin-top:8px;'>
+            Cok fazla istek. 1 dakika sonra tekrar deneyin.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()
+
 if not data:
-    st.error("API'ye bağlanılamadı. Lütfen sayfayı yenileyin.")
+    st.error("API bağlantısı kurulamadı.")
     st.stop()
 
 sel = st.session_state["selected_currency"]
@@ -334,7 +394,7 @@ for code, sym, gram_v in ticker_items:
     <span class="ticker-item">
         <span class="ticker-label">ALTIN/{code}</span>
         <span class="ticker-sep">◆</span>
-        <span class="ticker-val">{sym}{formatted} /gr</span>
+        <span class="ticker-val">{safe_sym(sym)}{formatted} /gr</span>
     </span>"""
 
 ticker_html = f"""
@@ -383,21 +443,21 @@ st.markdown(f"""
 
   <div class="hero-card primary">
     <div class="hc-unit">Gram Altın</div>
-    <div class="hc-price big"><span class="hc-symbol">{sel_sym}</span>{num_fmt(gram_price)}</div>
+    <div class="hc-price big"><span class="hc-symbol">{safe_sym(sel_sym)}</span>{num_fmt(gram_price)}</div>
     <div class="hc-label">{sel_name} / Gram</div>
     <div class="hc-accent"></div>
   </div>
 
   <div class="hero-card">
     <div class="hc-unit">Ons Altın</div>
-    <div class="hc-price"><span class="hc-symbol">{sel_sym}</span>{num_fmt(ounce_price)}</div>
+    <div class="hc-price"><span class="hc-symbol">{safe_sym(sel_sym)}</span>{num_fmt(ounce_price)}</div>
     <div class="hc-label">{sel_name} / Troy Ons (31.10 gr)</div>
     <div class="hc-accent"></div>
   </div>
 
   <div class="hero-card">
     <div class="hc-unit">Tola Altın</div>
-    <div class="hc-price"><span class="hc-symbol">{sel_sym}</span>{num_fmt(tola_price)}</div>
+    <div class="hc-price"><span class="hc-symbol">{safe_sym(sel_sym)}</span>{num_fmt(tola_price)}</div>
     <div class="hc-label">{sel_name} / Tola (11.66 gr)</div>
     <div class="hc-accent"></div>
   </div>
@@ -407,32 +467,33 @@ st.markdown(f"""
 
 # ─── TÜRK ALTIN TIPLERI (sadece TRY'de göster) ────────────────────────────────
 if sel == "TRY":
+    _sym = safe_sym(sel_sym)
     st.markdown(f"""
     <div style='max-width:1100px;margin:16px auto;padding:0 32px;'>
         <div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;'>
 
           <div class="hero-card">
-            <div class="hc-unit">Yarım Altın</div>
+            <div class="hc-unit">Yarim Altin</div>
             <div class="hc-price" style="font-size:1.5rem;">
-              <span class="hc-symbol">₺</span>{num_fmt(half_gr)}
+              <span class="hc-symbol">{_sym}</span>{num_fmt(half_gr)}
             </div>
-            <div class="hc-label">~3.50 gram · 21 ayar</div>
+            <div class="hc-label">~3.50 gram - 21 ayar</div>
           </div>
 
           <div class="hero-card">
-            <div class="hc-unit">Çeyrek Altın</div>
+            <div class="hc-unit">Ceyrek Altin</div>
             <div class="hc-price" style="font-size:1.5rem;">
-              <span class="hc-symbol">₺</span>{num_fmt(quarter_gr)}
+              <span class="hc-symbol">{_sym}</span>{num_fmt(quarter_gr)}
             </div>
-            <div class="hc-label">~1.75 gram · 21 ayar</div>
+            <div class="hc-label">~1.75 gram - 21 ayar</div>
           </div>
 
           <div class="hero-card">
-            <div class="hc-unit">Cumhuriyet Altını</div>
+            <div class="hc-unit">Cumhuriyet Altini</div>
             <div class="hc-price" style="font-size:1.5rem;">
-              <span class="hc-symbol">₺</span>{num_fmt(republic_gr)}
+              <span class="hc-symbol">{_sym}</span>{num_fmt(republic_gr)}
             </div>
-            <div class="hc-label">~7.22 gram · 22 ayar</div>
+            <div class="hc-label">~7.22 gram - 22 ayar</div>
           </div>
 
         </div>
@@ -445,12 +506,12 @@ st.markdown(f"""
   <div class="silver-card">
     <div>
       <div class="silver-lbl">Gram Gümüş</div>
-      <div class="silver-val">{sel_sym}{num_fmt(silver_gram)}</div>
+      <div class="silver-val">{safe_sym(sel_sym)}{num_fmt(silver_gram)}</div>
     </div>
     <div class="silver-sep">|</div>
     <div>
       <div class="silver-lbl">Ons Gümüş</div>
-      <div class="silver-val">{sel_sym}{num_fmt(silver_gram * 31.1035)}</div>
+      <div class="silver-val">{safe_sym(sel_sym)}{num_fmt(silver_gram * 31.1035)}</div>
     </div>
     <div class="silver-sep">|</div>
     <div>
@@ -489,7 +550,7 @@ for code, (name, sym) in CURRENCIES.items():
         <div class="rr-name">{name}</div>
       </div>
       <div class="rr-right">
-        <div class="rr-val">{sym}{num_fmt(gram_v)}</div>
+        <div class="rr-val">{safe_sym(sym)}{num_fmt(gram_v)}</div>
         <div class="rr-unit">/gram</div>
       </div>
     </div>"""
