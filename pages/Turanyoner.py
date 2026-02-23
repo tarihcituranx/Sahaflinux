@@ -622,13 +622,8 @@ if ss["phase"] == "setup":
         </div>
         """, unsafe_allow_html=True)
 
-        groq_key = st.text_input(
-            "Groq API Anahtari (Telefon Jokeri icin)",
-            type="password",
-            value=ss["groq_key"],
-            placeholder="gsk_..."
-        )
-        ss["groq_key"] = groq_key
+        # Groq key secrets'tan otomatik okunuyor
+        ss["groq_key"] = st.secrets.get("GROQ_API_KEY", "")
 
         cat_choice = st.selectbox("Kategori Secin", list(CATEGORIES.keys()))
         diff_choice = st.selectbox("Zorluk Secin", list(DIFFICULTY_MAP.keys()))
@@ -718,7 +713,7 @@ elif ss["phase"] == "playing":
             phone_label = "Arkadasa Sor" + ("  [KULLANILDI]" if not ss["lifelines"]["phone"] else "")
             if st.button(phone_label, disabled=not ss["lifelines"]["phone"], key="btn_phone"):
                 if not ss["groq_key"]:
-                    st.warning("Telefon jokeri icin Groq API anahtari gerekli!")
+                    st.warning("Groq API anahtari bulunamadi! secrets.toml dosyasina GROQ_API_KEY ekleyin.")
                 else:
                     ss["lifelines"]["phone"] = False
                     ss["phone_used_this_q"] = True
