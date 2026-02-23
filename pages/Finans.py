@@ -4,6 +4,7 @@ import time
 import os
 import json as _json
 from datetime import datetime
+import zoneinfo
 
 st.set_page_config(
     page_title="Altin Fiyatlari | Canli",
@@ -108,7 +109,12 @@ def build_page(data: dict, sel: str) -> str:
     quarter_g  = gram_p * 1.754
     republic_g = gram_p * 7.216
 
-    now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
+    try:
+        tz_tr = zoneinfo.ZoneInfo("Europe/Istanbul")
+    except Exception:
+        tz_tr = None
+    now_tr = datetime.now(tz_tr) if tz_tr else datetime.now()
+    now_str = now_tr.strftime("%d.%m.%Y %H:%M") + " (TR)"
 
     # ── Ticker içeriği
     ticker_items = ""
@@ -147,7 +153,7 @@ def build_page(data: dict, sel: str) -> str:
     try_cards = ""
     if sel == "TRY":
         try_cards = f"""
-        <div class="section-title">Türk Altın Çeşitleri</div>
+        <div class="section-title">Anlık Altın Fiyatı — Türkiye</div>
         <div class="sub-grid">
             <div class="hero-card">
                 <div class="hc-unit">Yarım Altın</div>
@@ -453,8 +459,11 @@ body {{
     </select>
   </div>
 
+  <!-- TRY ÖZEL KARTLAR (üstte) -->
+  {try_cards}
+
   <!-- HERO KARTLAR -->
-  <div class="section-title">Anlık Altın Fiyatı</div>
+  <div class="section-title">Uluslararası Birimler</div>
   <div class="hero-grid">
     <div class="hero-card primary">
       <div class="hc-unit">Gram Altın</div>
@@ -472,9 +481,6 @@ body {{
       <div class="hc-label">{sel_name} / Tola (11.66 gr)</div>
     </div>
   </div>
-
-  <!-- TRY ÖZEL KARTLAR -->
-  {try_cards}
 
   <!-- GÜMÜŞ -->
   <div class="section-title">Gümüş</div>
