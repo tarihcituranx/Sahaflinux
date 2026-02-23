@@ -88,7 +88,7 @@ def nf(v: float) -> str:
 
 
 # ─── HTML SAYFA ŞABLONu ───────────────────────────────────────────────────────
-def build_page(data: dict, sel: str) -> str:
+def build_page(data: dict, sel: str, prev_data: dict = None) -> str:
     sel_name, sel_sym = CURRENCIES.get(sel, ("", sel))
 
     gold = data.get(sel, data.get("USD", {}))
@@ -108,6 +108,33 @@ def build_page(data: dict, sel: str) -> str:
     half_g     = gram_p * 3.508
     quarter_g  = gram_p * 1.754
     republic_g = gram_p * 7.216
+
+    # Önceki fiyatlar
+    prev_data = prev_data or {}
+    prev_gold      = prev_data.get(sel, prev_data.get("USD", {}))
+    prev_gram_p    = float(prev_gold.get("gram",  0))
+    prev_ounce_p   = float(prev_gold.get("ounce", 0))
+    prev_tola_p    = float(prev_gold.get("tola",  0))
+    prev_half_g    = prev_gram_p * 3.508
+    prev_quarter_g = prev_gram_p * 1.754
+    prev_republic_g= prev_gram_p * 7.216
+    _prev_usd_gram = float(prev_data.get("USD", {}).get("gram", 0))
+    _prev_xag      = float(prev_data.get("XAG", {}).get("ounce", 59.4))
+    prev_silver_g  = (_prev_usd_gram / max(_prev_xag, 0.001)) * (prev_gram_p / max(_prev_usd_gram, 0.001)) if _prev_usd_gram > 0 and prev_gram_p > 0 else 0
+
+    def chg(curr: float, prev: float) -> str:
+        if prev <= 0 or curr <= 0 or abs(curr - prev) < 0.0001:
+            return ""
+        diff = curr - prev
+        pct  = diff / prev * 100
+        arrow = "&#9650;" if diff > 0 else "&#9660;"
+        col   = "#4cb97a" if diff > 0 else "#e05050"
+        bg    = "rgba(76,185,122,0.13)" if diff > 0 else "rgba(224,80,80,0.13)"
+        brd   = "rgba(76,185,122,0.3)"  if diff > 0 else "rgba(224,80,80,0.3)"
+        pct_s = f"{abs(pct):.2f}".replace(".", ",")
+        dif_s = nf(abs(diff))
+        return (f'<span class="badge" style="color:{col};background:{bg};'
+                f'border:1px solid {brd};">{arrow} {dif_s} ({pct_s}%)</span>')
 
     try:
         tz_tr = zoneinfo.ZoneInfo("Europe/Istanbul")
@@ -136,6 +163,7 @@ def build_page(data: dict, sel: str) -> str:
         d  = data.get(code, {})
         gv = float(d.get("gram", 0))
         if gv <= 0: continue
+        prev_gv = float(prev_data.get(code, {}).get("gram", 0))
         active = ' style="border-color:rgba(212,168,71,0.7);background:rgba(212,168,71,0.07);"' if code == sel else ""
         rate_rows += f"""
         <div class="rr"{active}>
@@ -146,6 +174,7 @@ def build_page(data: dict, sel: str) -> str:
             <div class="rr-right">
                 <div class="rr-val">{sym} {nf(gv)}</div>
                 <div class="rr-unit">/gram</div>
+                <div class="rr-change">{chg(gv, prev_gv)}</div>
             </div>
         </div>"""
 
@@ -155,25 +184,29 @@ def build_page(data: dict, sel: str) -> str:
         try_cards = f"""
         <div class="section-title">Anlık Altın Fiyatı — Türkiye</div>
         <div class="sub-grid four">
-            <div class="hero-card primary">
-                <div class="hc-unit">Gram Altın</div>
-                <div class="hc-price sm">{sel_sym} {nf(gram_p)}</div>
-                <div class="hc-label">1 gram · 24 ayar saf</div>
- <div class="hero-card">
+            <div class="hero-card">
                 <div class="hc-unit">Çeyrek Altın</div>
                 <div class="hc-price sm">{sel_sym} {nf(quarter_g)}</div>
                 <div class="hc-label">~1.75 gram · 21 ayar</div>
-            </div>
+                <div class="hc-change">{chg(quarter_g, prev_quarter_g)}</div>
             </div>
             <div class="hero-card">
                 <div class="hc-unit">Yarım Altın</div>
                 <div class="hc-price sm">{sel_sym} {nf(half_g)}</div>
                 <div class="hc-label">~3.50 gram · 21 ayar</div>
+                <div class="hc-change">{chg(half_g, prev_half_g)}</div>
+            </div>
+            <div class="hero-card primary">
+                <div class="hc-unit">Gram Altın</div>
+                <div class="hc-price sm">{sel_sym} {nf(gram_p)}</div>
+                <div class="hc-label">1 gram · 24 ayar saf</div>
+                <div class="hc-change">{chg(gram_p, prev_gram_p)}</div>
             </div>
             <div class="hero-card">
                 <div class="hc-unit">Cumhuriyet Altını</div>
                 <div class="hc-price sm">{sel_sym} {nf(republic_g)}</div>
                 <div class="hc-label">~7.22 gram · 22 ayar</div>
+                <div class="hc-change">{chg(republic_g, prev_republic_g)}</div>
             </div>
         </div>"""
 
@@ -355,6 +388,16 @@ body {{
     background: linear-gradient(90deg, transparent, var(--gold), transparent);
     opacity: 0.35;
 }}
+.badge {{
+    display: inline-flex; align-items: center; gap: 3px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.63rem; font-weight: 600;
+    padding: 3px 8px; border-radius: 20px;
+    margin-top: 6px; letter-spacing: 0.02em;
+    white-space: nowrap; line-height: 1;
+}}
+.hc-change {{ margin-top: 4px; min-height: 24px; }}
+.rr-change .badge {{ font-size: 0.57rem; padding: 2px 5px; margin-top: 2px; }}
 .hc-unit {{
     font-family: 'DM Mono', monospace;
     font-size: 0.6rem; letter-spacing: 0.25em;
@@ -563,16 +606,19 @@ body {{
       <div class="hc-unit">Gram Altın</div>
       <div class="hc-price big">{sel_sym} {nf(gram_p)}</div>
       <div class="hc-label">{sel_name} / Gram</div>
+      <div class="hc-change">{chg(gram_p, prev_gram_p)}</div>
     </div>
     <div class="hero-card">
       <div class="hc-unit">Ons Altın</div>
       <div class="hc-price">{sel_sym} {nf(ounce_p)}</div>
       <div class="hc-label">{sel_name} / Troy Ons (31.10 gr)</div>
+      <div class="hc-change">{chg(ounce_p, prev_ounce_p)}</div>
     </div>
     <div class="hero-card">
       <div class="hc-unit">Tola Altın</div>
       <div class="hc-price">{sel_sym} {nf(tola_p)}</div>
       <div class="hc-label">{sel_name} / Tola (11.66 gr)</div>
+      <div class="hc-change">{chg(tola_p, prev_tola_p)}</div>
     </div>
   </div>
 
@@ -582,6 +628,7 @@ body {{
     <div class="sc-item">
       <div class="sc-label">Gram Gümüş</div>
       <div class="sc-val">{sel_sym} {nf(silver_gram)}</div>
+      <div class="rr-change">{chg(silver_gram, prev_silver_g)}</div>
     </div>
     <div class="sc-sep">|</div>
     <div class="sc-item">
@@ -634,6 +681,8 @@ def build_options(sel: str) -> str:
 # Para birimi seçimi — query params üzerinden
 if "currency" not in st.session_state:
     st.session_state["currency"] = "TRY"
+if "prev_data" not in st.session_state:
+    st.session_state["prev_data"] = {}
 
 # Veri çek
 data = fetch_prices()
@@ -669,10 +718,11 @@ with col:
         st.rerun()
 
 # Tüm sayfayı HTML olarak render et
-html = build_page(data, st.session_state["currency"])
+html = build_page(data, st.session_state["currency"], st.session_state["prev_data"])
 st.components.v1.html(html, height=2400, scrolling=True)
 
 # 60s'de otomatik güncelle
 time.sleep(60)
+st.session_state["prev_data"] = dict(data)  # bir sonraki karşılaştırma için
 st.cache_data.clear()
 st.rerun()
