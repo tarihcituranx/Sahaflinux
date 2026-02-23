@@ -104,10 +104,11 @@ def build_page(data: dict, sel: str, prev_data: dict = None) -> str:
     silver_gram  = (float(data.get("USD",{}).get("gram",166.3)) / xag_ratio) * conv
     silver_oz    = silver_gram * 31.1035
 
-    # Türk altın tipleri
-    half_g     = gram_p * 3.508
-    quarter_g  = gram_p * 1.754
-    republic_g = gram_p * 7.216
+    # Türk altın tipleri (doğru gramajlar - 22 ayar ziynet serisi)
+    quarter_g  = gram_p * 1.754   # Çeyrek: 1.754 gr, 22 ayar
+    half_g     = gram_p * 3.508   # Yarım:  3.508 gr, 22 ayar
+    full_g     = gram_p * 7.016   # Tam:    7.016 gr, 22 ayar
+    republic_g = gram_p * 7.216   # Cumhuriyet (Ata Lira): 7.216 gr, 22 ayar
 
     # Önceki fiyatlar
     prev_data = prev_data or {}
@@ -115,9 +116,10 @@ def build_page(data: dict, sel: str, prev_data: dict = None) -> str:
     prev_gram_p    = float(prev_gold.get("gram",  0))
     prev_ounce_p   = float(prev_gold.get("ounce", 0))
     prev_tola_p    = float(prev_gold.get("tola",  0))
-    prev_half_g    = prev_gram_p * 3.508
-    prev_quarter_g = prev_gram_p * 1.754
-    prev_republic_g= prev_gram_p * 7.216
+    prev_quarter_g  = prev_gram_p * 1.754
+    prev_half_g     = prev_gram_p * 3.508
+    prev_full_g     = prev_gram_p * 7.016
+    prev_republic_g = prev_gram_p * 7.216
     _prev_usd_gram = float(prev_data.get("USD", {}).get("gram", 0))
     _prev_xag      = float(prev_data.get("XAG", {}).get("ounce", 59.4))
     prev_silver_g  = (_prev_usd_gram / max(_prev_xag, 0.001)) * (prev_gram_p / max(_prev_usd_gram, 0.001)) if _prev_usd_gram > 0 and prev_gram_p > 0 else 0
@@ -187,25 +189,25 @@ def build_page(data: dict, sel: str, prev_data: dict = None) -> str:
             <div class="hero-card">
                 <div class="hc-unit">Çeyrek Altın</div>
                 <div class="hc-price sm">{sel_sym} {nf(quarter_g)}</div>
-                <div class="hc-label">~1.75 gram · 21 ayar</div>
+                <div class="hc-label">1.754 gram · 22 ayar</div>
                 <div class="hc-change">{chg(quarter_g, prev_quarter_g)}</div>
             </div>
             <div class="hero-card">
                 <div class="hc-unit">Yarım Altın</div>
                 <div class="hc-price sm">{sel_sym} {nf(half_g)}</div>
-                <div class="hc-label">~3.50 gram · 21 ayar</div>
+                <div class="hc-label">3.508 gram · 22 ayar</div>
                 <div class="hc-change">{chg(half_g, prev_half_g)}</div>
             </div>
             <div class="hero-card primary">
-                <div class="hc-unit">Gram Altın</div>
-                <div class="hc-price sm">{sel_sym} {nf(gram_p)}</div>
-                <div class="hc-label">1 gram · 24 ayar saf</div>
-                <div class="hc-change">{chg(gram_p, prev_gram_p)}</div>
+                <div class="hc-unit">Tam Altın</div>
+                <div class="hc-price sm">{sel_sym} {nf(full_g)}</div>
+                <div class="hc-label">7.016 gram · 22 ayar</div>
+                <div class="hc-change">{chg(full_g, prev_full_g)}</div>
             </div>
             <div class="hero-card">
                 <div class="hc-unit">Cumhuriyet Altını</div>
                 <div class="hc-price sm">{sel_sym} {nf(republic_g)}</div>
-                <div class="hc-label">~7.22 gram · 22 ayar</div>
+                <div class="hc-label">7.216 gram · 22 ayar</div>
                 <div class="hc-change">{chg(republic_g, prev_republic_g)}</div>
             </div>
         </div>"""
@@ -574,6 +576,100 @@ body {{
     {ticker_items}
   </div>
 </div>
+
+<!-- CANLI SAAT + COUNTDOWN BAR -->
+<div id="clockbar" style="
+    background:linear-gradient(90deg,#0a0800,#100e00,#0a0800);
+    border-bottom:1px solid rgba(212,168,71,0.12);
+    padding:6px 20px;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:8px;
+    font-family:'DM Mono',monospace; font-size:0.68rem;
+">
+    <div style="display:flex;align-items:center;gap:16px;">
+        <span style="color:rgba(212,168,71,0.5);letter-spacing:0.15em;font-size:0.58rem;">TR SAATI</span>
+        <span id="clock-time" style="color:#f0e8d0;letter-spacing:0.08em;font-size:0.82rem;font-weight:500;">--:--:--</span>
+        <span id="clock-date" style="color:rgba(255,255,255,0.3);font-size:0.62rem;"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+        <span id="update-label" style="color:rgba(212,168,71,0.5);font-size:0.6rem;letter-spacing:0.12em;"></span>
+        <div style="width:120px;height:4px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;">
+            <div id="countdown-bar" style="height:100%;background:linear-gradient(90deg,#d4a847,#f0c96a);border-radius:4px;transition:width 1s linear;width:100%;"></div>
+        </div>
+        <span id="countdown-sec" style="color:#d4a847;font-size:0.7rem;min-width:28px;text-align:right;"></span>
+    </div>
+</div>
+
+<!-- BİLDİRİM -->
+<div id="notif" style="
+    display:none; position:fixed; top:74px; right:16px; z-index:999;
+    background:rgba(76,185,122,0.15); border:1px solid rgba(76,185,122,0.4);
+    border-radius:10px; padding:10px 18px;
+    font-family:'DM Mono',monospace; font-size:0.72rem;
+    color:#4cb97a; letter-spacing:0.1em;
+    box-shadow:0 4px 20px rgba(0,0,0,0.4);
+    animation: fadeIn 0.3s ease;
+">✓ &nbsp;VERİ GÜNCELLENDİ</div>
+
+<style>
+@keyframes fadeIn {{ from{{opacity:0;transform:translateY(-8px)}} to{{opacity:1;transform:translateY(0)}} }}
+</style>
+
+<script>
+(function() {{
+    var REFRESH_SEC = 60;
+    var loadTime = Date.now();
+    var firstLoad = !sessionStorage.getItem('finans_loaded');
+    if (!firstLoad) {{
+        // sayfa yenilendi = güncellendi bildirimi
+        var n = document.getElementById('notif');
+        if (n) {{
+            n.style.display = 'block';
+            setTimeout(function(){{ n.style.display='none'; }}, 3500);
+        }}
+    }}
+    sessionStorage.setItem('finans_loaded', '1');
+
+    function pad(n) {{ return n < 10 ? '0'+n : n; }}
+
+    function tick() {{
+        // TR saati
+        var now = new Date();
+        var tr = new Intl.DateTimeFormat('tr-TR', {{
+            timeZone: 'Europe/Istanbul',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        }}).format(now);
+        var trDate = new Intl.DateTimeFormat('tr-TR', {{
+            timeZone: 'Europe/Istanbul',
+            day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'short'
+        }}).format(now);
+
+        var ct = document.getElementById('clock-time');
+        var cd = document.getElementById('clock-date');
+        if (ct) ct.textContent = tr;
+        if (cd) cd.textContent = trDate;
+
+        // Countdown
+        var elapsed = Math.floor((Date.now() - loadTime) / 1000);
+        var rem = Math.max(0, REFRESH_SEC - (elapsed % REFRESH_SEC));
+        var pct = (rem / REFRESH_SEC) * 100;
+
+        var bar = document.getElementById('countdown-bar');
+        var sec = document.getElementById('countdown-sec');
+        var lbl = document.getElementById('update-label');
+        if (bar) bar.style.width = pct + '%';
+        if (bar) bar.style.background = rem < 10
+            ? 'linear-gradient(90deg,#e05050,#ff8080)'
+            : 'linear-gradient(90deg,#d4a847,#f0c96a)';
+        if (sec) sec.textContent = rem + 's';
+        if (lbl) lbl.textContent = rem === 0 ? 'GÜNCELLENİYOR...' : 'SONRA GÜNCELLENİR';
+    }}
+
+    tick();
+    setInterval(tick, 1000);
+}})();
+</script>
 
 <!-- SAYFA -->
 <div class="page">
