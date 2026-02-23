@@ -553,6 +553,24 @@ body{{background:var(--dark);color:#f0e8d4;font-family:'DM Sans',sans-serif;-web
 .cc-usd{{font-family:'DM Mono',monospace;font-size:0.72rem;color:rgba(255,255,255,0.42)}}
 .cc-try{{font-family:'DM Mono',monospace;font-size:0.86rem;color:#f0e8d4;font-weight:500;margin-top:1px}}
 
+/* SORUMLULUK REDDİ */
+.disclaimer{{
+    display:flex;align-items:flex-start;gap:14px;
+    background:linear-gradient(135deg,rgba(212,168,71,0.06),rgba(212,168,71,0.03));
+    border:1px solid rgba(212,168,71,0.22);
+    border-left:3px solid rgba(212,168,71,0.55);
+    border-radius:10px;padding:16px 20px;margin-top:20px;
+}}
+.disc-icon{{font-size:1.1rem;margin-top:1px;flex-shrink:0}}
+.disc-title{{
+    font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.18em;
+    color:#c8a050;text-transform:uppercase;font-weight:600;margin-bottom:7px;
+}}
+.disc-text{{
+    font-size:0.7rem;color:rgba(255,255,255,0.42);line-height:1.65;
+}}
+.disc-text strong{{color:rgba(255,255,255,0.62);font-weight:600}}
+
 /* BİLDİRİM */
 #notif{{display:none;position:fixed;top:68px;right:16px;z-index:999;background:rgba(76,185,122,0.15);border:1px solid rgba(76,185,122,0.4);border-radius:10px;padding:10px 18px;font-family:'DM Mono',monospace;font-size:0.7rem;color:#4cb97a;letter-spacing:0.1em;box-shadow:0 4px 20px rgba(0,0,0,0.4);animation:fadeIn 0.3s ease}}
 @keyframes fadeIn{{from{{opacity:0;transform:translateY(-8px)}}to{{opacity:1;transform:translateY(0)}}}}
@@ -605,6 +623,23 @@ body{{background:var(--dark);color:#f0e8d4;font-family:'DM Sans',sans-serif;-web
         <span class="live-dot"></span>Canlı &nbsp;·&nbsp; Altın &nbsp;·&nbsp; Döviz &nbsp;·&nbsp; Kripto &nbsp;·&nbsp; {now_str}
     </div>
     <div class="divider"></div>
+  </div>
+
+  <!-- SORUMLULUK REDDİ -->
+  <div class="disclaimer">
+    <div class="disc-icon">⚠️</div>
+    <div class="disc-body">
+      <div class="disc-title">Sorumluluk Reddi &amp; Bilgilendirme</div>
+      <div class="disc-text">
+        Bu platform <strong>yalnızca bilgilendirme amaçlıdır</strong> ve yatırım tavsiyesi niteliği taşımaz.
+        Gösterilen fiyatlar <strong>gerçek zamanlı piyasa verileri</strong> değil; truncgil.com ve goldprice.today 
+        kaynaklı referans fiyatlardır. Gerçek alım-satım fiyatları yetkili aracı kurumlar, bankalar ve 
+        kuyumculara göre farklılık gösterebilir. <strong>YTD (Yılbaşından Bu Yana)</strong> değişim 
+        oranları ve günlük yüzde değişimler, önceki güne ait kapanış fiyatına göre hesaplanmış 
+        yaklaşık değerler olup kesinlik garantisi verilmemektedir. Herhangi bir finansal karar 
+        vermeden önce <strong>lisanslı bir yatırım danışmanına</strong> başvurmanız tavsiye edilir.
+      </div>
+    </div>
   </div>
 
   <!-- SPOT BANT -->
