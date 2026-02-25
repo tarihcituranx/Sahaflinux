@@ -1,0 +1,2018 @@
+[
+    {
+        "cid": 1,
+        "id": 1,
+        "isDownloaded": 0,
+        "name": "İslam'da İman Esasları",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/1.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/islamdaimanEsaslariKapak.jpg"
+    },
+    {
+        "cid": 1,
+        "id": 2,
+        "isDownloaded": 0,
+        "name": "Allah'a İman",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/2.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/bf437f5f-3f8d-46d6-a1dd-c955b655fda9.jpg"
+    },
+    {
+        "cid": 1,
+        "id": 3,
+        "isDownloaded": 0,
+        "name": "Meleklere İman",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/3.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/b3479e03-e52d-43e8-9e6b-516f04876f2c.jpg"
+    },
+    {
+        "cid": 1,
+        "id": 4,
+        "isDownloaded": 0,
+        "name": "Peygamberlere İman",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/4.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/0fbb86f6-b639-42b2-861b-30d460d62f21.jpg"
+    },
+    {
+        "cid": 1,
+        "id": 5,
+        "isDownloaded": 0,
+        "name": "Kadere İman",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/5.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/ba556774-c130-4f9f-b3f8-ffbd283bf415.jpg"
+    },
+    {
+        "cid": 1,
+        "id": 6,
+        "isDownloaded": 0,
+        "name": "Kitaplara İman",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/6.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/13033bd9-ea97-4ba2-85b9-a217847f5e18.jpg"
+    },
+    {
+        "cid": 1,
+        "id": 7,
+        "isDownloaded": 0,
+        "name": "Ahirete İman",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/7.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Ahireteiman.JPG"
+    },
+    {
+        "cid": 1,
+        "id": 8,
+        "isDownloaded": 0,
+        "name": "İlâhi Adalet ve Rahmet Penceresinden Kötülük ve Musibetler",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/8.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/4d30f8d7-4f83-4148-b8bb-546c77ac5468.jpg"
+    },
+    {
+        "cid": 1,
+        "id": 9,
+        "isDownloaded": 0,
+        "name": "Çağdaş İnanç Problemleri",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/9.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/01306aa7-7355-493b-b3e7-5cb2c29cb957.jpg"
+    },
+    {
+        "cid": 1,
+        "id": 10,
+        "isDownloaded": 0,
+        "name": "Pezdevinin Kelami Görüşleri ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/10.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/pezdevinin_kelami_gorusleri.png"
+    },
+    {
+        "cid": 1,
+        "id": 11,
+        "isDownloaded": 0,
+        "name": " Niçin İnanıyorum?",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/11.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/nicin-inaniyorum.PNG"
+    },
+    {
+        "cid": 2,
+        "id": 12,
+        "isDownloaded": 0,
+        "name": "Kamil Miras",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/12.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/kamil_miras.png"
+    },
+    {
+        "cid": 2,
+        "id": 13,
+        "isDownloaded": 0,
+        "name": "Aziz Mahmud Hüdayi",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/13.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/aziz_mahmd_011.png"
+    },
+    {
+        "cid": 2,
+        "id": 14,
+        "isDownloaded": 0,
+        "name": "Gazzali",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/14.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/gazzali001.png"
+    },
+    {
+        "cid": 2,
+        "id": 15,
+        "isDownloaded": 0,
+        "name": "Hasan Basri Cantay",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/15.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/hasan_baasri_canty.png"
+    },
+    {
+        "cid": 2,
+        "id": 16,
+        "isDownloaded": 0,
+        "name": "İbn-i Hazm",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/16.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/ibn_hazm001.png"
+    },
+    {
+        "cid": 2,
+        "id": 17,
+        "isDownloaded": 0,
+        "name": "İbn-i Sina",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/17.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/ibn_i_sina001.png"
+    },
+    {
+        "cid": 3,
+        "id": 18,
+        "isDownloaded": 0,
+        "name": "Kurban Sıkça Sorulan Sorular",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/18.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/84a095bd-4296-4a3a-93dd-ea4c7d68b476.jpg"
+    },
+    {
+        "cid": 3,
+        "id": 19,
+        "isDownloaded": 0,
+        "name": "Oruçla İlgili Sıkça Sorulan Sorular ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/19.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/03a08402-d7bd-4f0e-9e4d-97908d5e6f29.jpg"
+    },
+    {
+        "cid": 3,
+        "id": 20,
+        "isDownloaded": 0,
+        "name": "Zekatla İlgili Sıkça Sorulan Sorular ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/20.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/1fcebb02-8bee-49af-9462-8b95bcb89d68.jpg"
+    },
+    {
+        "cid": 3,
+        "id": 21,
+        "isDownloaded": 0,
+        "name": "Hac Sıkça Sorulan Sorular ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/21.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/5cc7e920-a454-446e-b189-a5848d3eddc6.jpg"
+    },
+    {
+        "cid": 3,
+        "id": 22,
+        "isDownloaded": 0,
+        "name": "Stomalı Hastalar İle İlgili Sıkça Sorulan Sorular ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/22.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/1ef5639f-1ab9-4c8d-a8c1-390f1a1d702e.jpg"
+    },
+    {
+        "cid": 4,
+        "id": 23,
+        "isDownloaded": 0,
+        "name": "Selamlaşmak Ne Güzel",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/23.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/SelamlasmakNeGuzel.jpg"
+    },
+    {
+        "cid": 4,
+        "id": 24,
+        "isDownloaded": 0,
+        "name": "Kardeşlik Oyunu Ne Güzel",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/24.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/KardeslikOyunuNeGuzel.jpg"
+    },
+    {
+        "cid": 4,
+        "id": 25,
+        "isDownloaded": 0,
+        "name": "Hastaları Mutlu Etmek Ne Güzel",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/25.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/HastalariMutluEtmekNeGuzel.jpg"
+    },
+    {
+        "cid": 4,
+        "id": 26,
+        "isDownloaded": 0,
+        "name": "Yardımlaşmak Ne Güzel",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/26.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/YardimlasmakNeGuzel.jpg"
+    },
+    {
+        "cid": 4,
+        "id": 27,
+        "isDownloaded": 0,
+        "name": "Affetmek Ne Güzel",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/27.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/AffetmekNeGuzel.jpg"
+    },
+    {
+        "cid": 4,
+        "id": 28,
+        "isDownloaded": 0,
+        "name": "40 Hadis Düşler Adası",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/28.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisDuslerAdasi.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 29,
+        "isDownloaded": 0,
+        "name": "Büyük Karanlığın Sırrı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/29.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/BuyukKaranliginSirri.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 30,
+        "isDownloaded": 0,
+        "name": "Betül'ün Günlüğü Olmazsa Olmaz",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/30.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/BetulunGunlugu1.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 31,
+        "isDownloaded": 0,
+        "name": "Çocuklar İçin Kur'an Terimleri Sözlüğü",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/31.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/KuranTerimleriSozlugu.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 32,
+        "isDownloaded": 0,
+        "name": "Adem Peygamber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/32.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/01-Adem-Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 33,
+        "isDownloaded": 0,
+        "name": "Nuh Peygamber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/33.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/02-Nuh-Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 34,
+        "isDownloaded": 0,
+        "name": "İbrahim Peygamber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/34.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/03-ibrahim-Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 35,
+        "isDownloaded": 0,
+        "name": "Yusuf Peygamber ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/35.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/04-Yusuf-Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 36,
+        "isDownloaded": 0,
+        "name": "Eyyüb Peygamber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/36.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/05-Eyyub-Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 37,
+        "isDownloaded": 0,
+        "name": "Musa Peygaber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/37.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/06-Musa-Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 38,
+        "isDownloaded": 0,
+        "name": "Davud Paygamber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/38.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/07-Davud%20Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 39,
+        "isDownloaded": 0,
+        "name": "Süleyman Peygamber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/39.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/08-Suleyman%20Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 40,
+        "isDownloaded": 0,
+        "name": "Yunus Peygamber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/40.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/09-Yunus-Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 41,
+        "isDownloaded": 0,
+        "name": "İsa Peygamber",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/41.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/10-isa-Peygamber.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 42,
+        "isDownloaded": 0,
+        "name": "Göl Masalı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/42.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/gol_masali001.png"
+    },
+    {
+        "cid": 5,
+        "id": 43,
+        "isDownloaded": 0,
+        "name": "Çöl Masalı ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/43.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/col_masali01.png"
+    },
+    {
+        "cid": 5,
+        "id": 44,
+        "isDownloaded": 0,
+        "name": "Gök Masalı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/44.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/gok_masali01.png"
+    },
+    {
+        "cid": 5,
+        "id": 45,
+        "isDownloaded": 0,
+        "name": "Köz Masalı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/45.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/koz_masali01.png"
+    },
+    {
+        "cid": 5,
+        "id": 46,
+        "isDownloaded": 0,
+        "name": "Hikayelerle Çocuklara 40 Ayet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/46.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetKapak.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 47,
+        "isDownloaded": 0,
+        "name": "Hikayelerle Çocuklara 40 Hadis",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/47.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisKapak.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 48,
+        "isDownloaded": 0,
+        "name": "Hikayelerle Çocuklara 40 Dua",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/48.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40Dua.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 49,
+        "isDownloaded": 0,
+        "name": "Hikayelerle Çocuklara Esma-i Hüsna",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/49.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/CocuklaraEsmaiHusna.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 50,
+        "isDownloaded": 0,
+        "name": "Güzel Dinim Her Yanı Bilim İlimde Saklı Bilim",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/50.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/ilimdeSakliBilimKapak.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 51,
+        "isDownloaded": 0,
+        "name": "Güzel Dinim Her Yanı Bilim Evrende Saklı Bilim",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/51.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/EvrendeSakliBilimKapak.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 52,
+        "isDownloaded": 0,
+        "name": "Güzel Dinim Her Yanı Bilim Hayatımda Saklı Bilim",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/52.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/HayatimdaSakliBilimKapak.jpg"
+    },
+    {
+        "cid": 5,
+        "id": 53,
+        "isDownloaded": 0,
+        "name": "Güzel Dinim Her Yanı Bilim Evimde Saklı Bilim",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/53.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/EvimdeSakliBilimKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 54,
+        "isDownloaded": 0,
+        "name": "Şiddet Karşısında İslam",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/54.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/siddet_karsisinde_islam01.png"
+    },
+    {
+        "cid": 6,
+        "id": 55,
+        "isDownloaded": 0,
+        "name": "Daiş'in Temel Felsefesi ve Dini Referansları Raporu ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/55.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/3e72c866-3796-48df-8960-d7986a8205e5.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 56,
+        "isDownloaded": 0,
+        "name": "Dini İstismar ve Tedhiş Hareketi Deaş ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/56.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/399674fb-b1e1-4403-94f7-bbfe774d933b.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 57,
+        "isDownloaded": 0,
+        "name": "Kendi Dilinden Fetö Örgütlü Bir Din İstismarı ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/57.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/72e1a228-b50c-4318-9429-208905c770c0.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 58,
+        "isDownloaded": 0,
+        "name": "Irkçılık",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/58.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/irkcilikKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 59,
+        "isDownloaded": 0,
+        "name": "Hayat Hakkı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/59.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/HayatHakkiKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 60,
+        "isDownloaded": 0,
+        "name": "Hak Duyarlılığı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/60.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/HakDuyarliligiKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 61,
+        "isDownloaded": 0,
+        "name": "Güven Toplumu",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/61.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/GuvenToplumuKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 62,
+        "isDownloaded": 0,
+        "name": "Adalet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/62.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/AdaletKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 63,
+        "isDownloaded": 0,
+        "name": "Terör",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/63.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/TerorKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 64,
+        "isDownloaded": 0,
+        "name": "Taassub",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/64.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/TaassupKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 65,
+        "isDownloaded": 0,
+        "name": "Şiddet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/65.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/SiddetKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 66,
+        "isDownloaded": 0,
+        "name": "İyilik ve İhsan",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/66.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/iyilikveihsanKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 67,
+        "isDownloaded": 0,
+        "name": "İslam Ümmeti",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/67.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/islamummetiKapak.jpg"
+    },
+    {
+        "cid": 6,
+        "id": 68,
+        "isDownloaded": 0,
+        "name": "Onur ve İffet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/68.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/onurveiffet.jpg"
+    },
+    {
+        "cid": 7,
+        "id": 69,
+        "isDownloaded": 0,
+        "name": "İslamofobi Endüstrisi",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/69.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/islamofobi_endstrisi.png"
+    },
+    {
+        "cid": 7,
+        "id": 70,
+        "isDownloaded": 0,
+        "name": "Religon and Society",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/70.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/RELİGON_AND_SOCİETY.png"
+    },
+    {
+        "cid": 8,
+        "id": 71,
+        "isDownloaded": 0,
+        "name": "Mevlid Külliyatı - 1",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/71.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/mevlid_kulliyati_01.png"
+    },
+    {
+        "cid": 8,
+        "id": 72,
+        "isDownloaded": 0,
+        "name": "Mevlid Külliyatı - 2",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/72.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/mevlid_kllyati_002.png"
+    },
+    {
+        "cid": 8,
+        "id": 73,
+        "isDownloaded": 0,
+        "name": "Mevlid Külliyatı - 3",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/73.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/mvld_kllyat_003.png"
+    },
+    {
+        "cid": 9,
+        "id": 74,
+        "isDownloaded": 0,
+        "name": "Toplumsal Emanet: Engelliler",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/74.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/ToplumsalEmanetEngelliler.jpg"
+    },
+    {
+        "cid": 10,
+        "id": 75,
+        "isDownloaded": 0,
+        "name": "Fetvalar",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/75.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/fetvalar.jpg"
+    },
+    {
+        "cid": 10,
+        "id": 76,
+        "isDownloaded": 0,
+        "name": "İslam İlmihali",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/76.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/islamilmihali.jpg"
+    },
+    {
+        "cid": 10,
+        "id": 77,
+        "isDownloaded": 0,
+        "name": "Şâfiî Mezhebine Mensup Kişilere İmamlık Yaparken Dikkat Edilmesi Gereken Hususlar ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/77.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/SafiiMezheineMensupKisilere.jpg"
+    },
+    {
+        "cid": 11,
+        "id": 78,
+        "isDownloaded": 0,
+        "name": "Kitap Medeniyeti",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/78.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/KitapMedeniyeti2.jpg"
+    },
+    {
+        "cid": 11,
+        "id": 79,
+        "isDownloaded": 0,
+        "name": "Peygamberimiz ve Gençlik ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/79.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Peygamberimizvegenclik.JPG"
+    },
+    {
+        "cid": 11,
+        "id": 80,
+        "isDownloaded": 0,
+        "name": "Ailemde Bir Genç Var ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/80.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Ailemde%20Bir%20Genç%20Var.JPG"
+    },
+    {
+        "cid": 11,
+        "id": 81,
+        "isDownloaded": 0,
+        "name": "Niçin İnanıyorum?",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/81.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/nicin-inaniyorum.PNG"
+    },
+    {
+        "cid": 12,
+        "id": 82,
+        "isDownloaded": 0,
+        "name": "Fetvalar",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/82.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/fetvalar.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 83,
+        "isDownloaded": 0,
+        "name": "Osmanlı Devletinde Fetva Eminliği ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/83.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/osmanli_devletinde_fetv_eminligi01.png"
+    },
+    {
+        "cid": 12,
+        "id": 84,
+        "isDownloaded": 0,
+        "name": "Ahlak Dersleri",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/84.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/ahlak_dersleri01.png"
+    },
+    {
+        "cid": 12,
+        "id": 85,
+        "isDownloaded": 0,
+        "name": "Alemlere Rahmet Hz. Muhammed",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/85.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/alemlere_rahmet.png"
+    },
+    {
+        "cid": 12,
+        "id": 86,
+        "isDownloaded": 0,
+        "name": "Allah İnsan ve Merhamet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/86.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/ALLAHinsanvemerhamet.png"
+    },
+    {
+        "cid": 12,
+        "id": 87,
+        "isDownloaded": 0,
+        "name": "Kutsal İklimde Dua ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/87.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/KutsaliklimdeDua.PNG"
+    },
+    {
+        "cid": 12,
+        "id": 88,
+        "isDownloaded": 0,
+        "name": "Dualar ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/88.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Dualar.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 89,
+        "isDownloaded": 0,
+        "name": "40 Ayette Gelin Gönüller Yapalım",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/89.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetGelinGonullerYapalim.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 90,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Gelin Gönüller Yapalım",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/90.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisGelinGonullerYapalim.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 91,
+        "isDownloaded": 0,
+        "name": "40 Ayette Birlikte Yaşama Ahlakı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/91.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteBirlikteYasamaAhlaki.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 92,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Birlikte Yaşama Ahlakı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/92.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteBirlikteYasamaAhlaki.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 93,
+        "isDownloaded": 0,
+        "name": "40 Ayette Emanet ve Güven",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/93.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteEmanetveGuven.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 94,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Emanet ve Güven",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/95.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteEmanetveGuven.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 95,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Emanet ve Güven",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/95.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteEmanetveGuven.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 96,
+        "isDownloaded": 0,
+        "name": "40 Ayette Merhamet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/96.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteMerhamet.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 97,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Merhamet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/97.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteMerhamet.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 98,
+        "isDownloaded": 0,
+        "name": "40 Ayette Namaz",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/98.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteNamaz.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 99,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Namaz",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/99.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteNamaz.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 100,
+        "isDownloaded": 0,
+        "name": "40 Ayette Tevhid ve Vahdet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/100.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteTevhidVahdet.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 101,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Tevhid ve Vahdet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/101.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteTevhidveVahdet.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 102,
+        "isDownloaded": 0,
+        "name": "Ayetlerle Hac ve Umre",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/102.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/AyetlerleHacveUmre.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 103,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Hac ve Umre",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/103.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteHacveUmre.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 104,
+        "isDownloaded": 0,
+        "name": "Ayetlerle Kardeşlik ve Hukuku",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/104.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/AyetlerleKardeslikHukuku.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 105,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Kardeşlik",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/105.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteKardeslik.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 106,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Ramazan",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/106.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteRamazan.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 107,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Helal Kazanç",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/107.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteHelalKazanc.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 108,
+        "isDownloaded": 0,
+        "name": "Peygamberimizin Dilinden Dualar ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/108.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/PeygamberimizinDilindenDualar.JPG"
+    },
+    {
+        "cid": 12,
+        "id": 109,
+        "isDownloaded": 0,
+        "name": "Orucu Anlamak",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/109.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/OrucuAnlamakKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 110,
+        "isDownloaded": 0,
+        "name": "Haccı Anlama",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/110.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/HacciAnlamakKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 111,
+        "isDownloaded": 0,
+        "name": "Ezanı Anlamak",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/111.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/EzaniAnlamakKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 112,
+        "isDownloaded": 0,
+        "name": "Duayı Anlamak",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/112.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/DuayiAnlamakKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 113,
+        "isDownloaded": 0,
+        "name": "Zekatı Anlamak",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/113.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/ZekatiAnlamakKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 114,
+        "isDownloaded": 0,
+        "name": "Irkçılık",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/114.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/irkcilikKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 115,
+        "isDownloaded": 0,
+        "name": "Hayat Hakkı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/115.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/HayatHakkiKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 116,
+        "isDownloaded": 0,
+        "name": "Hak Duyarlılığı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/116.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/HakDuyarliligiKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 117,
+        "isDownloaded": 0,
+        "name": "Güven Toplumu",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/117.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/GuvenToplumuKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 118,
+        "isDownloaded": 0,
+        "name": "Adalet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/118.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/AdaletKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 119,
+        "isDownloaded": 0,
+        "name": "Terör",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/119.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/TerorKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 120,
+        "isDownloaded": 0,
+        "name": "Taassub",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/120.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/TaassupKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 121,
+        "isDownloaded": 0,
+        "name": "Şiddet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/121.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/SiddetKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 122,
+        "isDownloaded": 0,
+        "name": "İyilik ve İhsan",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/122.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/iyilikveihsanKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 123,
+        "isDownloaded": 0,
+        "name": "İslam Ümmeti",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/123.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/islamummetiKapak.jpg"
+    },
+    {
+        "cid": 12,
+        "id": 124,
+        "isDownloaded": 0,
+        "name": "Onur ve İffet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/124.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/onurveiffet.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 125,
+        "isDownloaded": 0,
+        "name": "Riyazü's-Salihin 1. Cilt",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/125.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Riyazussalihin.png"
+    },
+    {
+        "cid": 13,
+        "id": 126,
+        "isDownloaded": 0,
+        "name": "Riyazü's-Salihin 2. Cilt",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/126.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Riyazussalihin.png"
+    },
+    {
+        "cid": 13,
+        "id": 127,
+        "isDownloaded": 0,
+        "name": "Riyazü's-Salihin 3. Cilt",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/127.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Riyazussalihin.png"
+    },
+    {
+        "cid": 13,
+        "id": 128,
+        "isDownloaded": 0,
+        "name": "Hadislerle İslam Serlevha Hadisler ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/128.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Hadislerle%20islamSerlevhaHadisler.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 129,
+        "isDownloaded": 0,
+        "name": "40 Hadis 40 Yorum",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/129.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40Hadis40Yorum.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 130,
+        "isDownloaded": 0,
+        "name": "Hikmetin 40 Kapısı 40 Hadis 40 Yorum ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/130.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Hikmetin40Kapisi40Hadis40Yorum.JPG"
+    },
+    {
+        "cid": 13,
+        "id": 131,
+        "isDownloaded": 0,
+        "name": "İlahi Hadisler ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/131.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/ilahi_hadisler_011.png"
+    },
+    {
+        "cid": 13,
+        "id": 132,
+        "isDownloaded": 0,
+        "name": "Seçme Hadisler Güzel Ahlak",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/132.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/SecmeHadisler.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 133,
+        "isDownloaded": 0,
+        "name": "40 Ayette Gelin Gönüller Yapalım",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/133.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetGelinGonullerYapalim.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 134,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Gelin Gönüller Yapalım",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/134.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisGelinGonullerYapalim.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 135,
+        "isDownloaded": 0,
+        "name": "40 Ayette Birlikte Yaşama Ahlakı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/135.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteBirlikteYasamaAhlaki.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 136,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Birlikte Yaşama Ahlakı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/136.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteBirlikteYasamaAhlaki.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 137,
+        "isDownloaded": 0,
+        "name": "40 Ayette Emanet ve Güven",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/137.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteEmanetveGuven.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 138,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Emanet ve Güven",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/139.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteEmanetveGuven.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 139,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Emanet ve Güven",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/139.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteEmanetveGuven.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 140,
+        "isDownloaded": 0,
+        "name": "40 Ayette Merhamet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/140.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteMerhamet.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 141,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Merhamet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/141.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteMerhamet.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 142,
+        "isDownloaded": 0,
+        "name": "40 Ayette Namaz",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/142.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteNamaz.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 143,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Namaz",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/143.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteNamaz.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 144,
+        "isDownloaded": 0,
+        "name": "40 Ayette Tevhid ve Vahdet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/144.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40AyetteTevhidVahdet.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 145,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Tevhid ve Vahdet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/145.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteTevhidveVahdet.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 146,
+        "isDownloaded": 0,
+        "name": "Ayetlerle Hac ve Umre",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/146.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/AyetlerleHacveUmre.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 147,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Hac ve Umre",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/147.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteHacveUmre.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 148,
+        "isDownloaded": 0,
+        "name": "Ayetlerle Kardeşlik ve Hukuku",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/148.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/AyetlerleKardeslikHukuku.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 149,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Kardeşlik",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/149.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteKardeslik.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 150,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Ramazan",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/150.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteRamazan.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 151,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Helal Kazanç",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/151.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40HadisteHelalKazanc.jpg"
+    },
+    {
+        "cid": 13,
+        "id": 152,
+        "isDownloaded": 0,
+        "name": "Peygamberimizin Dilinden Dualar ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/152.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/PeygamberimizinDilindenDualar.JPG"
+    },
+    {
+        "cid": 14,
+        "id": 153,
+        "isDownloaded": 0,
+        "name": "İslam Hukukunda Mülkiyet Hakkı ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/153.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/islam_hukukunda_mulkyet_hkki01.png"
+    },
+    {
+        "cid": 14,
+        "id": 154,
+        "isDownloaded": 0,
+        "name": "Yaratılış ve Gayelilik",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/154.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/yaratilisvegayelik01.png"
+    },
+    {
+        "cid": 14,
+        "id": 155,
+        "isDownloaded": 0,
+        "name": "Mişkatül Envar",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/155.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/miskatul_envar.png"
+    },
+    {
+        "cid": 15,
+        "id": 156,
+        "isDownloaded": 0,
+        "name": "Sorularla Mahremiyet Bilinci",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/156.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Sorularla%20Mahremiyet%20Bilinci.jpg"
+    },
+    {
+        "cid": 15,
+        "id": 157,
+        "isDownloaded": 0,
+        "name": "Aile Hayatımız",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/157.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/aile_hayatimiz01.png"
+    },
+    {
+        "cid": 15,
+        "id": 158,
+        "isDownloaded": 0,
+        "name": "Ailem",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/158.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/ailem01.png"
+    },
+    {
+        "cid": 15,
+        "id": 159,
+        "isDownloaded": 0,
+        "name": "Almanya’da Yaşayan Türk Kadınları",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/159.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/turk_kadinlari001.png"
+    },
+    {
+        "cid": 16,
+        "id": 160,
+        "isDownloaded": 0,
+        "name": "Vahyin Aydınlığında Yürümek",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/160.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/vahyn_aydnlgndayrmk01.png"
+    },
+    {
+        "cid": 16,
+        "id": 161,
+        "isDownloaded": 0,
+        "name": "Namaz Surelerin Tefsifi",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/161.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/namzsrelernntfsri01.png"
+    },
+    {
+        "cid": 16,
+        "id": 162,
+        "isDownloaded": 0,
+        "name": "Mehmet Akif Ersoy Tefsir",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/162.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/AMHTMAKFERSYTEFSR01.png"
+    },
+    {
+        "cid": 17,
+        "id": 163,
+        "isDownloaded": 0,
+        "name": "Hafızlık Risalesi",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/163.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/hafzlk_risalesi_01.png"
+    },
+    {
+        "cid": 17,
+        "id": 164,
+        "isDownloaded": 0,
+        "name": "Öğretici Kılavuz",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/164.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/yaz_kuran_kurslari_ogretici_k.png"
+    },
+    {
+        "cid": 17,
+        "id": 165,
+        "isDownloaded": 0,
+        "name": "Mesleğe Hazırlık Eğitimleri",
+        "path": "https://egitimhizmetleri.diyanet.gov.tr/Documents/MESLEĞE%20HAZIRLIK%20EĞİTİMLERİ-Konulu%20Ayet%20ve%20Hadisler.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/meslege-hazirlik.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 166,
+        "isDownloaded": 0,
+        "name": "Dinim İslam",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/166.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/dinim-islam.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 167,
+        "isDownloaded": 0,
+        "name": "Kur'an Kursları Etkinlik Kitabı-1",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/167.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/kuran-kursları-etkinlik-kitabı-1.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 168,
+        "isDownloaded": 0,
+        "name": "Kur'an Kursları Etkinlik Kitabı-2",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/168.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/kuran-kursları-etkinlik-kitabı-2.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 169,
+        "isDownloaded": 0,
+        "name": "Yaz Kur'an Kursları Dinimi Öğreniyorum",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/169.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/yaz-kur%27an-kursları-dinimi-ogreniyorum.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 170,
+        "isDownloaded": 0,
+        "name": "Yaz Kur'an Kursları Etkinlik Kitabı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/170.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/yaz-kur%27an-kursları-etkinlik-kitabi.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 171,
+        "isDownloaded": 0,
+        "name": "Kur'an Kursları Öğretici Kitabı (4-6 Yaş Grubu)-1",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/171.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/kuran-kursları-ögretici-kitabı-1.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 172,
+        "isDownloaded": 0,
+        "name": "Kur'an Kursları Öğretici Kitabı (4-6 Yaş Grubu)-2",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/172.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/kuran-kursları-ögretici-kitabı-2.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 173,
+        "isDownloaded": 0,
+        "name": "Kur'an Kursları Etkinlik Kitabı (4-6 Yaş Grubu)-2",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/173.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/yaz-kur%27an-kursları-etkinlik-kitabi-2.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 174,
+        "isDownloaded": 0,
+        "name": "Hoş Geldin Ramazan ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/174.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/hos-geldin-ramazan.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 175,
+        "isDownloaded": 0,
+        "name": "Dinimizi Öğreniyoruz Etkinlik ve Eğlence Kitabı - 2",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/175.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/etkinlik-ve-eglence-kitabı-2.PNG"
+    },
+    {
+        "cid": 17,
+        "id": 176,
+        "isDownloaded": 0,
+        "name": "Dinimizi Öğreniyoruz Etkinlik ve Eğlence Kitabı - 3",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/176.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/etkinlik-ve-eglence-kitabı-3.PNG"
+    },
+    {
+        "cid": 18,
+        "id": 177,
+        "isDownloaded": 0,
+        "name": "Peygamber (S.A.V.) Hayatı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/177.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/peygamberimizn_hayati.png"
+    },
+    {
+        "cid": 18,
+        "id": 178,
+        "isDownloaded": 0,
+        "name": "Siyer-i Nebi",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/178.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/SiyeriNebiKapak.jpg"
+    },
+    {
+        "cid": 18,
+        "id": 179,
+        "isDownloaded": 0,
+        "name": "Hz. Muhammed ve Evrensel Mesajı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/179.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/hzmuhammed-ve-evrensel-mesaji.jpg"
+    },
+    {
+        "cid": 18,
+        "id": 180,
+        "isDownloaded": 0,
+        "name": "Peygamberimiz ve Aile",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/180.pdf",
+        "photo": "https://webdosya.diyanet.gov.tr/mevlidinebi/UserFiles/00000000-0000-0000-0000-000000000000/2019/11/7/1ba41d8e-1fa5-48d7-a0a8-014e39185686_4_150x208.png"
+    },
+    {
+        "cid": 18,
+        "id": 181,
+        "isDownloaded": 0,
+        "name": "Peygamberimiz ve Gençlik ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/181.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Peygamberimizvegenclik.JPG"
+    },
+    {
+        "cid": 18,
+        "id": 182,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber ve Güven Toplumu",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/182.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Hz.%20Muhammed%20ve%20Güven%20Toplumu.JPG"
+    },
+    {
+        "cid": 18,
+        "id": 183,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber Tevhid ve Vahdet ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/183.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Hz.%20Peygamber%20Tevhid%20ve%20Vahdet.JPG"
+    },
+    {
+        "cid": 18,
+        "id": 184,
+        "isDownloaded": 0,
+        "name": "Peygamber ve Birlikte Yaşama Ahlakı ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/184.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/HzPeygamberveBirlikteYasamaAhlaki.JPG"
+    },
+    {
+        "cid": 19,
+        "id": 185,
+        "isDownloaded": 0,
+        "name": "Cami ve Namazla Diriliş",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/185.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/cami_ve_namazla_dirilis.png"
+    },
+    {
+        "cid": 19,
+        "id": 186,
+        "isDownloaded": 0,
+        "name": "Güven Toplumu",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/186.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/guven_toplumu.png"
+    },
+    {
+        "cid": 19,
+        "id": 187,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber ve Güven Toplumu",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/187.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/hzpeygmberveguventoplumu.png"
+    },
+    {
+        "cid": 19,
+        "id": 188,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber ve İnsan Onuru",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/188.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/hzpeygamberveinsanonuru.png"
+    },
+    {
+        "cid": 19,
+        "id": 189,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber Din ve Samimiyet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/189.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/hzpeygamberdinvesamimyet.png"
+    },
+    {
+        "cid": 19,
+        "id": 190,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber ve İnsan Yetiştirme Düzeni",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/190.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/insanyetistrmeduzeni.png"
+    },
+    {
+        "cid": 19,
+        "id": 191,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber ve Kardeşlik Hukuku",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/191.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/kardeslikhukuku.png"
+    },
+    {
+        "cid": 20,
+        "id": 192,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/192.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Feto-Din-istismarinin-Arkasina-Saklanan-Teror-Orgutu-Arapça.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 193,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/193.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Deas-Dehsete-Dayali-Bir-Din-İstismari-Arapca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 194,
+        "isDownloaded": 0,
+        "name": "Kendi Dilinden Fetö",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/194.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Kendi-Dilinden-Feto-Arapca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 195,
+        "isDownloaded": 0,
+        "name": "Uluslararası Hicri Takvim Birliği Kongresi",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/195.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/6979a88f-f8ae-4090-a90c-fee8eeff9d88.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 196,
+        "isDownloaded": 0,
+        "name": "استغلال الدين وحركة داعش الإرهابية ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/196.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/b525bdf9-dc72-48e1-8f3e-0f1503ff4414.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 197,
+        "isDownloaded": 0,
+        "name": "Arnavutça Kendi Dilinden Fetö",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/197.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Kendi-Dilinden-Feto-Arnavutca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 198,
+        "isDownloaded": 0,
+        "name": "Arnavutça Kur'an Öğreniyorum",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/198.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Kuran-Ogreniyorum-Arnavutca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 199,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü  Endonezce",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/199.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Feto-Din-istismarinin-Arkasina-Saklanan-Teror-Orgutu-Endonezce.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 200,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı  Endonezce",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/200.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Deas-Dehsete-Dayali-Bir-Din-İstismari-Endonezce.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 201,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü  Farsça",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/201.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Feto-Din-istismarinin-Arkasina-Saklanan-Teror-Orgutu-Farsca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 202,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı Farsça",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/202.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Deas-Dehsete-Dayali-Bir-Din-İstismari-Farsça.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 203,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü  Fransızca",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/203.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/FRANSIZCA%20FETÖ%20KAPAK.png"
+    },
+    {
+        "cid": 20,
+        "id": 204,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı Fransızca",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/204.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/FRANSIZCA%20DEAŞ%20KAPAK.png"
+    },
+    {
+        "cid": 20,
+        "id": 205,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü  Gürcüce",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/205.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Feto-Din-istismarinin-Arkasina-Saklanan-Teror-Orgutu-Gurcuce.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 206,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı Gürcüce",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/206.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Deas-Dehsete-Dayali-Bir-Din-İstismari-Gurcuce.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 207,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü  İngilizce",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/207.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Feto-Din-istismarinin-Arkasina-Saklanan-Teror-Orgutu-ingilizce.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 208,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı İngilizce",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/208.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Deas-Dehsete-Dayali-Bir-Din-İstismari-ingilizce.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 209,
+        "isDownloaded": 0,
+        "name": "Kendi Dilinden Fetö İngilizce",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/209.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/İNGİLİZCE%20KENDİ%20DİLİNDEN%20FETO.png"
+    },
+    {
+        "cid": 20,
+        "id": 210,
+        "isDownloaded": 0,
+        "name": "Kur'an Öğreniyorum Elif-Ba İngilizce",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/210.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Kuran-Ogreniyorum-ingilizce.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 211,
+        "isDownloaded": 0,
+        "name": "Exploitation Of Religion And Terrorist Organization Daesh",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/211.pdf",
+        "photo": "https://dosya.diyanet.gov.tr/DIYKDosya/YayinDosya/6c81ddfa-8cd6-421c-acce-2d73d492b2b5.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 212,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü  İspanyolca",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/212.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Feto-Din-istismarinin-Arkasina-Saklanan-Teror-Orgutu-ispanyolca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 213,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı İspanyolca",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/213.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Deas-Dehsete-Dayali-Bir-Din-İstismari-ispanyolca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 214,
+        "isDownloaded": 0,
+        "name": "İspanyolca Kur'an Öğreniyorum Elif-Ba",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/214.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/İSPANYOLCA%20KURAN%20ÖĞRENİYORUM.png"
+    },
+    {
+        "cid": 20,
+        "id": 215,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü  Korece",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/215.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Feto-Din-istismarinin-Arkasina-Saklanan-Teror-Orgutu-Korece.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 216,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı Korece ",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/216.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Deas-Dehsete-Dayali-Bir-Din-İstismari-Korece.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 217,
+        "isDownloaded": 0,
+        "name": "Fetö Din İstismarının Arkasına Saklanan Terör Örgütü  Rusça",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/217.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Feto-Din-istismarinin-Arkasina-Saklanan-Teror-Orgutu-Rusca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 218,
+        "isDownloaded": 0,
+        "name": "Deaş Dehşete Dayalı Bir Din İstismarı  Rusça",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/218.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Deas-Dehsete-Dayali-Bir-Din-İstismari-Rusca.jpg"
+    },
+    {
+        "cid": 20,
+        "id": 219,
+        "isDownloaded": 0,
+        "name": "Rusça Kur'an Öğreniyorum",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/219.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Kuran-Ogreniyorum-Rusca.jpg"
+    },
+    {
+        "cid": 21,
+        "id": 220,
+        "isDownloaded": 0,
+        "name": "Cami ve Namazla Diriliş",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/220.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/cami_ve_namazla_dirilis.png"
+    },
+    {
+        "cid": 21,
+        "id": 221,
+        "isDownloaded": 0,
+        "name": "Güven Toplumu",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/221.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/guven_toplumu.png"
+    },
+    {
+        "cid": 21,
+        "id": 222,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber ve Güven Toplumu",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/222.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/hzpeygmberveguventoplumu.png"
+    },
+    {
+        "cid": 21,
+        "id": 223,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber ve İnsan Onuru",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/223.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/hzpeygamberveinsanonuru.png"
+    },
+    {
+        "cid": 21,
+        "id": 224,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber Din ve Samimiyet",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/224.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/hzpeygamberdinvesamimyet.png"
+    },
+    {
+        "cid": 21,
+        "id": 225,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber İnsan Yetiştirme Düzeni",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/225.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/insanyetistrmeduzeni.png"
+    },
+    {
+        "cid": 21,
+        "id": 226,
+        "isDownloaded": 0,
+        "name": "Hz. Peygamber Kardeşlik Hukuku",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/226.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/Documents/kardeslikhukuku.png"
+    },
+    {
+        "cid": 22,
+        "id": 227,
+        "isDownloaded": 0,
+        "name": "Sorumluluk Bilinci",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/227.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/sorumlulukbilincikapak.jpg"
+    },
+    {
+        "cid": 22,
+        "id": 228,
+        "isDownloaded": 0,
+        "name": "Ramazan Günlükleri - 1",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/228.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/ramazan-gunlukleri-1.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 229,
+        "isDownloaded": 0,
+        "name": "Ramazan Günlükleri - 2",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/229.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/ramazan-gunlukleri-2.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 230,
+        "isDownloaded": 0,
+        "name": "Diyanet Aylık Dergisi Ramazan 2020",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/230.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/2020-ramazan-dergi.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 231,
+        "isDownloaded": 0,
+        "name": "Diyanet Çocuk Dergisi Ramazan 2020",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/231.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/nisan-cocuk-2020.png"
+    },
+    {
+        "cid": 22,
+        "id": 232,
+        "isDownloaded": 0,
+        "name": "Diyanet Aile Dergisi Ramazan 2020",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/232.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/aile-nisan-2020.png"
+    },
+    {
+        "cid": 22,
+        "id": 233,
+        "isDownloaded": 0,
+        "name": "40 Ayette Sorumluluk Bilinci",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/233.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40-ayette-sorumluluk-bilinci.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 234,
+        "isDownloaded": 0,
+        "name": "40 Hadiste Sorumluluk Bilinci",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/234.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/40-hadiste-sorumluluk-bilinci.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 235,
+        "isDownloaded": 0,
+        "name": "Dualar",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/235.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Dualar.jpg"
+    },
+    {
+        "cid": 22,
+        "id": 236,
+        "isDownloaded": 0,
+        "name": "Oruç Sıkça Sorulanlar",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/236.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Oruc-Sikca-Sorulan-Sorular.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 237,
+        "isDownloaded": 0,
+        "name": "Gelin Gönüller Yapalım",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/237.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/gelin-gonuller-yapalim.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 238,
+        "isDownloaded": 0,
+        "name": "Orucu Anlamak",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/238.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/OrucuAnlamakKapak.jpg"
+    },
+    {
+        "cid": 22,
+        "id": 239,
+        "isDownloaded": 0,
+        "name": "Zekatı Anlamak",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/113.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/ZekatiAnlamakKapak.jpg"
+    },
+    {
+        "cid": 22,
+        "id": 240,
+        "isDownloaded": 0,
+        "name": "İslam İlmihali",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/240.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/islamilmihali.jpg"
+    },
+    {
+        "cid": 22,
+        "id": 241,
+        "isDownloaded": 0,
+        "name": "Fetvalar",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/241.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/fetvalar.jpg"
+    },
+    {
+        "cid": 22,
+        "id": 242,
+        "isDownloaded": 0,
+        "name": "Helal Kazanç Helal Tüketim",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/242.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/helal%20kazanç%20helal%20tüketim.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 243,
+        "isDownloaded": 0,
+        "name": "İyilik",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/243.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/iyilik.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 244,
+        "isDownloaded": 0,
+        "name": "İnfak",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/244.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/İnfak.png"
+    },
+    {
+        "cid": 22,
+        "id": 245,
+        "isDownloaded": 0,
+        "name": "İsraf",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/245.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/İsraf.png"
+    },
+    {
+        "cid": 22,
+        "id": 246,
+        "isDownloaded": 0,
+        "name": "Hoş Geldin Ramazan",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/246.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/hos-geldin-ramazan.PNG"
+    },
+    {
+        "cid": 22,
+        "id": 247,
+        "isDownloaded": 0,
+        "name": "Hafız - I",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/247.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Hafıiz-1.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 248,
+        "isDownloaded": 0,
+        "name": "Hafız - 2",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/248.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Hafiz-2.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 249,
+        "isDownloaded": 0,
+        "name": "Hafız - 3",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/249.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/Hafiz-3.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 250,
+        "isDownloaded": 0,
+        "name": "Din ve Bilim Işığında Oruç ve Sağlık",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/250.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/din-ve-bilim-isiginda-oruc-ve-saglik.JPG"
+    },
+    {
+        "cid": 22,
+        "id": 251,
+        "isDownloaded": 0,
+        "name": "İslamın Salgın Hastalıklara Bakışı",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/251.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/capture-20200421-151842.png"
+    },
+    {
+        "cid": 22,
+        "id": 252,
+        "isDownloaded": 0,
+        "name": "Ramazanın Bereketi Oruç",
+        "path": "https://mobil.diyanet.gov.tr/mobile/diyanetkitaplik/252.pdf",
+        "photo": "https://diniyayinlar.diyanet.gov.tr/ResimKitapligi/ramazan-bereketi-oruc.JPG"
+    }
+]
