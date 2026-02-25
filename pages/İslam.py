@@ -409,38 +409,28 @@ geo_lat  = params.get("lat",     None)
 geo_lng  = params.get("lng",     None)
 geo_red  = params.get("geo_red", None)
 
+# Geolocation arka planda çalışır — uygulamayı BLOKE ETMEZ
+# st.stop() kaldırıldı: iframe sandbox yüzünden redirect bazen çalışmıyordu
 if not geo_lat and not geo_red and not st.session_state.geo_denendi:
     st.components.v1.html("""
     <script>
     (function() {
         try {
-            var base = window.parent.location.href.split('?')[0];
-            if (!navigator.geolocation) {
-                window.parent.location.href = base + '?geo_red=1'; return;
-            }
+            if (!navigator.geolocation) return;
             navigator.geolocation.getCurrentPosition(
                 function(pos) {
-                    window.parent.location.href = base
-                        + '?lat=' + pos.coords.latitude.toFixed(5)
-                        + '&lng=' + pos.coords.longitude.toFixed(5);
+                    var url = new URL(window.parent.location.href);
+                    url.searchParams.set('lat', pos.coords.latitude.toFixed(5));
+                    url.searchParams.set('lng', pos.coords.longitude.toFixed(5));
+                    window.parent.location.replace(url.toString());
                 },
-                function() { window.parent.location.href = base + '?geo_red=1'; },
-                { timeout: 8000, maximumAge: 300000 }
+                function() { /* izin reddedildi, sessizce geç */ },
+                { timeout: 6000, maximumAge: 300000 }
             );
-        } catch(e) {
-            try { window.parent.location.href = window.parent.location.href.split('?')[0] + '?geo_red=1'; } catch(x) {}
-        }
+        } catch(e) {}
     })();
     </script>
-    <div style="text-align:center;padding:70px 20px;font-family:Tajawal,sans-serif;
-                color:#7a9dbd;background:#080e1a;min-height:200px;">
-        <div style="font-size:2.5em;margin-bottom:12px;">📍</div>
-        <div style="font-size:1.2em;color:#5a8aaa;">Konumunuz tespit ediliyor…</div>
-        <div style="font-size:0.8em;color:#3a5a70;margin-top:8px;">Tarayıcınızda konum izni istenecektir</div>
-    </div>
-    """, height=200)
-    st.session_state.geo_denendi = True
-    st.stop()
+    """, height=0)
 
 st.session_state.geo_denendi = True
 
