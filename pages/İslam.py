@@ -1859,18 +1859,113 @@ with tab2:
                     """, unsafe_allow_html=True)
                     st.components.v1.html(canlı_gs_js("imsak-gs", imsak_dt), height=0)
 
-        # Günlük dua (Groq)
+        # Günlük Dua — Hadis/Kuran kaynaklı, sabit liste (Groq uydurmuyor)
+        _RAMAZAN_DUALARI = {
+            1:  ("بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ",
+                 "Bismillâhirrahmânirrahîm",
+                 "Rahman ve Rahim olan Allah'ın adıyla. (Kuran, her surenin başlangıcı)"),
+            2:  ("اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ",
+                 "Allâhümme innî es'elüke'l-afve ve'l-âfiyete",
+                 "Allah'ım! Senden af ve afiyet istiyorum. (Tirmizi, 3514)"),
+            3:  ("رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",
+                 "Rabbenâ âtinâ fid-dünyâ haseneten ve fil-âhirati haseneten ve kınâ azâben-nâr",
+                 "Rabbimiz! Bize dünyada iyilik, ahirette de iyilik ver ve bizi cehennem azabından koru. (Bakara, 201)"),
+            4:  ("اللَّهُمَّ أَعِنِّي عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ",
+                 "Allâhümme eınnî alâ zikrike ve şükrike ve hüsni ibâdetik",
+                 "Allah'ım! Seni zikretmemi, sana şükretmemi ve sana güzel kulluk etmemi sağla. (Ebû Dâvûd, 1522)"),
+            5:  ("اللَّهُمَّ اغْفِرْ لِي وَارْحَمْنِي وَاهْدِنِي وَعَافِنِي وَارْزُقْنِي",
+                 "Allâhümmağfir lî verhamnî vehdini ve âfinî verzüknî",
+                 "Allah'ım! Beni bağışla, bana merhamet et, bana hidayet et, afiyet ver ve rızıklandır. (Müslim, 2697)"),
+            6:  ("سُبْحَانَكَ لَا إِلَٰهَ إِلَّا أَنْتَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ",
+                 "Sübhâneke lâ ilâhe illâ ente innî küntü minez-zâlimîn",
+                 "Seni tenzih ederim. Senden başka ilah yoktur. Gerçekten ben zalimlerden oldum. (Enbiyâ, 87 — Hz. Yunus'un duası)"),
+            7:  ("اللَّهُمَّ إِنِّي أَسْأَلُكَ الْجَنَّةَ وَأَعُوذُ بِكَ مِنَ النَّارِ",
+                 "Allâhümme innî es'elükel-cennete ve eûzü bike minen-nâr",
+                 "Allah'ım! Senden cenneti istiyorum ve cehennemden sana sığınıyorum. (Ebû Dâvûd, 792)"),
+            8:  ("اللَّهُمَّ ذَهَبَ الظَّمَأُ وَابْتَلَّتِ الْعُرُوقُ وَثَبَتَ الْأَجْرُ إِنْ شَاءَ اللَّهُ",
+                 "Allâhümme zehebez-zamaü vebtelleti'l-urûku ve sebbete'l-ecru inşâellâh",
+                 "Allah'ım! Susuzluk gitti, damarlar ıslandı ve inşallah ecir sabit oldu. — İftarda okunacak dua (Ebû Dâvûd, 2357)"),
+            9:  ("رَبِّ اغْفِرْ وَارْحَمْ وَأَنْتَ خَيْرُ الرَّاحِمِينَ",
+                 "Rabbİğfir verham ve ente hayrur-râhimîn",
+                 "Rabbim! Bağışla ve merhamet et. Sen merhametlilerin en hayırlısısın. (Müminûn, 118)"),
+            10: ("اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي",
+                 "Allâhümme inneke afüvvün tühibbü'l-afve fa'fü annî",
+                 "Allah'ım! Sen çok affedicisin, affetmeyi seversin; beni affet. — Kadir Gecesi Duası (Tirmizî, 3513)"),
+            11: ("حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ",
+                 "Hasbünellâhu ve ni'mel-vekîl",
+                 "Allah bize yeter. O ne güzel vekildir. (Âl-i İmrân, 173)"),
+            12: ("رَبَّنَا لَا تُزِغْ قُلُوبَنَا بَعْدَ إِذْ هَدَيْتَنَا وَهَبْ لَنَا مِنْ لَدُنْكَ رَحْمَةً",
+                 "Rabbenâ lâ tüziğ kulûbenâ ba'de iz hedeytenâ veheb lenâ min ledünke rahmeten",
+                 "Rabbimiz! Bize hidayet verdikten sonra kalplerimizi kaydırma ve katından bize rahmet bağışla. (Âl-i İmrân, 8)"),
+            13: ("اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ",
+                 "Allâhümme innî eûzü bike minel-hemmi vel-hazen",
+                 "Allah'ım! Sıkıntı ve üzüntüden sana sığınırım. (Buhârî, 6369)"),
+            14: ("رَبِّ زِدْنِي عِلْمًا",
+                 "Rabbi zidnî ilmâ",
+                 "Rabbim! İlmimi artır. (Tâhâ, 114)"),
+            15: ("اللَّهُمَّ أَصْلِحْ لِي دِينِي الَّذِي هُوَ عِصْمَةُ أَمْرِي",
+                 "Allâhümme aslih lî dîniyelleziî hüve ısmetu emrî",
+                 "Allah'ım! İşlerimin kıvamı olan dinimi benim için ıslah et. (Müslim, 2720)"),
+            16: ("يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ",
+                 "Yâ Hayyu yâ Kayyûm, bi-rahmetike esteğîs",
+                 "Ey her daim diri olan, ey her şeyi ayakta tutan! Rahmetinle imdat istiyorum. (Tirmizî, 3524)"),
+            17: ("رَبَّنَا اغْفِرْ لَنَا وَلِإِخْوَانِنَا الَّذِينَ سَبَقُونَا بِالْإِيمَانِ",
+                 "Rabbenağfir lenâ ve li-ihvâninelleziine sebakûnâ bil-îmân",
+                 "Rabbimiz! Bizi ve bizden önce iman etmiş kardeşlerimizi bağışla. (Haşr, 10)"),
+            18: ("اللَّهُمَّ بَارِكْ لَنَا فِي رَمَضَانَ",
+                 "Allâhümme bârik lenâ fî Ramazân",
+                 "Allah'ım! Bize Ramazan'ı mübarek kıl."),
+            19: ("رَبَّنَا تَقَبَّلْ مِنَّا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ",
+                 "Rabbenâ tekabbel minnâ inneke entes-semîul-alîm",
+                 "Rabbimiz! Bizden kabul et. Şüphesiz sen Semi' ve Alim'sin. (Bakara, 127)"),
+            20: ("اللَّهُمَّ اجْعَلْنِي مِنَ التَّوَّابِينَ وَاجْعَلْنِي مِنَ الْمُتَطَهِّرِينَ",
+                 "Allâhümme'c-alnî minet-tevvâbîne vec'alnî minel-mütetahhirîn",
+                 "Allah'ım! Beni çok tövbe edenlerden ve temizlenenlerden kıl. (Tirmizî, 55)"),
+            21: ("رَبِّ أَوْزِعْنِي أَنْ أَشْكُرَ نِعْمَتَكَ الَّتِي أَنْعَمْتَ عَلَيَّ",
+                 "Rabbi evzı'nî en eşküre nı'metekelletî en'amte aleyye",
+                 "Rabbim! Bana verdiğin nimetine şükretmemi bana ilham et. (Neml, 19)"),
+            22: ("اللَّهُمَّ اجْعَلْ خَيْرَ عُمُرِي آخِرَهُ",
+                 "Allâhümmec'al hayra umurî âhirah",
+                 "Allah'ım! Ömrümün en hayırlı kısmını son kısmı yap. (Nîsâî, Amelü'l-yevm, 568)"),
+            23: ("اللَّهُمَّ إِنِّي أَسْأَلُكَ الثَّبَاتَ فِي الْأَمْرِ",
+                 "Allâhümme innî es'elükesebâte fil-emr",
+                 "Allah'ım! Senden işlerde sebat istiyorum. (Nîsâî, 1305)"),
+            24: ("رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ",
+                 "Rabbenâ heb lenâ min ezvâcinâ ve zürriyyâtinâ kurrete a'yün",
+                 "Rabbimiz! Bize eşlerimizden ve torunlarımızdan göz aydınlığı bağışla. (Furkân, 74)"),
+            25: ("اللَّهُمَّ أَحْسِنْ عَاقِبَتَنَا فِي الْأُمُورِ كُلِّهَا",
+                 "Allâhümme ahsin âkıbetanâ fil-umûri kullihâ",
+                 "Allah'ım! Tüm işlerimizin sonunu güzel eyle. (Taberânî)"),
+            26: ("اللَّهُمَّ اجْعَلْنَا مِمَّنْ تُدْرِكُهُمْ لَيْلَةُ الْقَدْرِ",
+                 "Allâhümmec'alnâ mimmen tüdrikühüm leyletül-kadr",
+                 "Allah'ım! Bizi Kadir Gecesi'ne erişenlerden kıl."),
+            27: ("اللَّهُمَّ لَكَ صُمْتُ وَعَلَى رِزْقِكَ أَفْطَرْتُ",
+                 "Allâhümme leke sumtü ve alâ rızkıke eftartü",
+                 "Allah'ım! Senin için oruç tuttum ve senin rızıkla iftar ettim. — İftar Duası (Ebû Dâvûd, 2358)"),
+            28: ("سُبْحَانَ اللَّهِ وَبِحَمْدِهِ سُبْحَانَ اللَّهِ الْعَظِيمِ",
+                 "Sübhânellâhi ve bihamdihî, sübhânellâhil-azîm",
+                 "Allah'ı tesbih ederim ve O'na hamdederim. Yüce Allah'ı tesbih ederim. (Buhârî, 6682)"),
+            29: ("اللَّهُمَّ تَقَبَّلْ صِيَامَنَا وَقِيَامَنَا",
+                 "Allâhümme tekabbel siyâmenâ ve kıyâmenâ",
+                 "Allah'ım! Orucumuzu ve kıyamımızı kabul et."),
+            30: ("اللَّهُمَّ اجْعَلْ لَنَا فِي كُلِّ رَمَضَانَ عِتْقًا مِنَ النَّارِ",
+                 "Allâhümmec'al lenâ fî külli ramazânin ıtkan minen-nâr",
+                 "Allah'ım! Her Ramazan'da bize cehennemden azat olmayı nasip et."),
+        }
+
         st.markdown('<div class="bolum-baslik">🤲 Günlük Ramazan Duası</div>', unsafe_allow_html=True)
-        if not st.session_state.ramazan_dua:
-            with st.spinner("Dua hazırlanıyor…"):
-                st.session_state.ramazan_dua = groq_sor(
-                    [{"role": "user", "content": f"Ramazanın {gun_no}. günü için güzel bir iftar duası yaz. Arapça orijinalini, Türkçe okunuşunu ve Türkçe anlamını ver. Kısa ve samimi olsun."}],
-                    sistem="Sen İslami bilgiye hakim, Türkçe konuşan saygılı bir din asistanısın.",
-                )
-        st.markdown(f'<div class="ayet-kutu"><div class="ayet-turkce" style="font-style:normal;">{st.session_state.ramazan_dua}</div></div>', unsafe_allow_html=True)
-        if st.button("🔄 Dua Yenile"):
-            st.session_state.ramazan_dua = None
-            st.rerun()
+        _gun_idx = min(max(int(gun_no or 1), 1), 30)
+        _dua_tuple = _RAMAZAN_DUALARI.get(_gun_idx, _RAMAZAN_DUALARI[27])
+        _dua_ar, _dua_okunuş, _dua_anlam = _dua_tuple
+        st.markdown(f"""
+        <div class="ayet-kutu">
+            <div style="font-family:Amiri,serif;font-size:1.5em;color:#c8a84b;direction:rtl;text-align:right;
+                        line-height:2;margin-bottom:10px;">{_dua_ar}</div>
+            <div style="color:#7ab0d0;font-size:0.95em;font-style:italic;margin-bottom:8px;">🔤 {_dua_okunuş}</div>
+            <div class="ayet-turkce" style="font-style:normal;">🌙 {_dua_anlam}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
 
     else:
         rv = ramazan_veri["data"]
