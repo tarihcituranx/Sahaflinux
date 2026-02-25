@@ -2646,66 +2646,115 @@ with tab5:
             
     # ── SESLİ ESERLER ──
     with lib_tabs[1]:
-        sk_path = "t/sesli_kitap_playlist_data.json"
-        eh_path = "t/esmaul_husna/esmaul_husna_playlist_data.json"
-        
-        st.markdown('<div style="color:#c8a84b;font-size:1.1em;border-bottom:1px solid #1e3d64;padding-bottom:5px;margin-bottom:15px;">🎧 Diyanet Sesli Kitaplar ve Sohbetler</div>', unsafe_allow_html=True)
-        if os.path.exists(sk_path):
-            with open(sk_path, "r", encoding="utf-8") as f:
-                sk_data = json.load(f)
-            
-            st.caption(f"Örnek içerikler gösteriliyor (Toplam {len(sk_data)} video mevcuttur)")
-            sk_disp = sk_data[:8]
-            for i in range(0, len(sk_disp), 4):
-                cols = st.columns(4)
+        # 6+1 kategori sub-tab olarak
+        se_tabs = st.tabs([
+            "🎧 Sesli Kitaplar (346)",
+            "✨ Esma-i Hüsna (99)",
+            "🎭 Radyo Tiyatrosu (160)",
+            "📖 Dijital Sözlük (50)",
+            "🎵 Dini Musiki (29)",
+            "🔤 Elif Bâ (26)",
+            "🌙 Oruç Dersleri (4)",
+        ])
+
+        # Yardımcı: JSON yükle + arama + sayfalandırma
+        def _playlist_tab(json_path: str, tab_key: str, baslik: str, renk: str = "#c8a84b"):
+            """Verilmiş JSON playlist dosyasını arama + sayfalandırma ile gösterir."""
+            if not os.path.exists(json_path):
+                st.warning(f"Dosya bulunamadı: {json_path}")
+                return
+            with open(json_path, "r", encoding="utf-8") as f:
+                _data = json.load(f)
+
+            st.markdown(
+                f'<div style="color:{renk};font-size:1.05em;border-bottom:1px solid #1e3d64;'
+                f'padding-bottom:5px;margin-bottom:12px;">{baslik} — {len(_data)} içerik</div>',
+                unsafe_allow_html=True
+            )
+            _q = st.text_input("🔍 Ara...", key=f"se_q_{tab_key}", placeholder="Başlık ara...")
+            _filtered = [it for it in _data
+                         if _q.lower() in it.get("title", "").lower()] if _q else _data
+
+            _page_size = 8
+            _pk = f"se_page_{tab_key}"
+            _lk = f"se_lq_{tab_key}"
+            if st.session_state.get(_lk) != _q:
+                st.session_state[_pk] = 0
+                st.session_state[_lk] = _q
+            _pi = st.session_state.get(_pk, 0)
+            _total = len(_filtered)
+            _total_pages = max(1, (_total - 1) // _page_size + 1)
+
+            c1, c2, c3 = st.columns([1, 2, 1])
+            with c1:
+                if st.button("⬅️", key=f"se_prev_{tab_key}", disabled=(_pi == 0)):
+                    st.session_state[_pk] = max(0, _pi - 1); st.rerun()
+            with c2:
+                st.markdown(f"<div style='text-align:center;color:#a0c0d8;'>Sayfa {_pi+1} / {_total_pages} ({_total} sonuç)</div>", unsafe_allow_html=True)
+            with c3:
+                if st.button("➡️", key=f"se_next_{tab_key}", disabled=(_pi >= _total_pages - 1)):
+                    st.session_state[_pk] = _pi + 1; st.rerun()
+
+            _page_items = _filtered[_pi * _page_size : (_pi + 1) * _page_size]
+            for i in range(0, len(_page_items), 4):
+                _cols = st.columns(4)
                 for j in range(4):
-                    if i + j < len(sk_disp):
-                        item = sk_disp[i + j]
-                        with cols[j]:
-                            yt_url = f"https://www.youtube.com{item.get('url', '')}"
-                            thumb = item.get("thumbnail", "https://i.ytimg.com/vi/1YZ9i0rMf_U/hqdefault.jpg")
-                            if not thumb: thumb = "https://i.ytimg.com/vi/1YZ9i0rMf_U/hqdefault.jpg"
+                    if i + j < len(_page_items):
+                        _it = _page_items[i + j]
+                        with _cols[j]:
+                            _yt_url = f"https://www.youtube.com{_it.get('url', '')}"
+                            _thumb  = _it.get("thumbnail", "") or "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+                            _dur    = _it.get("duration", "")
+                            _title  = _it.get("title", "").replace("<","&lt;").replace(">","&gt;")
                             st.markdown(
-                                f'''
-                                <a href="{yt_url}" target="_blank" style="text-decoration:none;">
-                                    <div style="background:#0c1c2e; border-radius:10px; overflow:hidden; border:1px solid #1e3d64; margin-bottom:15px;">
-                                        <img src="{thumb}" width="100%" style="display:block;">
-                                        <div style="padding:12px; font-size:0.85em; color:#ddd0b8; min-height:60px;">
-                                            {item.get("title", "")}
-                                        </div>
-                                    </div>
-                                </a>
-                                ''', unsafe_allow_html=True
+                                f'<a href="{_yt_url}" target="_blank" style="text-decoration:none;">'
+                                f'<div style="background:#0c1c2e;border-radius:10px;overflow:hidden;'
+                                f'border:1px solid #1e3d64;margin-bottom:14px;">'
+                                f'<img src="{_thumb}" width="100%" style="display:block;max-height:120px;object-fit:cover;">'
+                                f'<div style="padding:10px;">'
+                                f'<div style="font-size:0.8em;color:#ddd0b8;min-height:48px;">{_title}</div>'
+                                + (f'<div style="font-size:0.72em;color:#5a8aaa;margin-top:4px;">⏱ {_dur}</div>' if _dur else '')
+                                + f'</div></div></a>',
+                                unsafe_allow_html=True
                             )
-                            
-        st.markdown('<br><div style="color:#c8a84b;font-size:1.1em;border-bottom:1px solid #1e3d64;padding-bottom:5px;margin-bottom:15px;">✨ İşaret Dili ile Esma-i Hüsna</div>', unsafe_allow_html=True)
-        if os.path.exists(eh_path):
-            with open(eh_path, "r", encoding="utf-8") as f:
-                eh_data = json.load(f)
-            
-            st.caption("Kur'an-ı Kerim'de geçen 99 Esmâ'nın Diyanet İşaret Dili serisi")
-            eh_disp = eh_data[:8] 
-            for i in range(0, len(eh_disp), 4):
-                cols = st.columns(4)
-                for j in range(4):
-                    if i + j < len(eh_disp):
-                        item = eh_disp[i + j]
-                        with cols[j]:
-                            yt_url = f"https://www.youtube.com{item.get('url', '')}"
-                            thumb = item.get("thumbnail", "")
-                            if not thumb: thumb = "https://i.ytimg.com/vi/1YZ9i0rMf_U/hqdefault.jpg"
-                            st.markdown(
-                                f'''
-                                <a href="{yt_url}" target="_blank" style="text-decoration:none;">
-                                    <div style="background:#0c1c2e; border-radius:10px; overflow:hidden; border:1px solid #1e3d64; margin-bottom:15px;">
-                                        <img src="{thumb}" width="100%" style="display:block;">
-                                        <div style="padding:10px; font-size:0.85em; color:#ddd0b8; text-align:center;">
-                                            {item.get("title", "")}
-                                        </div>
-                                    </div>
-                                </a>
-                                ''', unsafe_allow_html=True
-                            )
+
+        with se_tabs[0]:
+            _playlist_tab("t/sesli_kitap_playlist_data.json", "sk", "🎧 Sesli Kitaplar ve Sohbetler")
+        with se_tabs[1]:
+            _playlist_tab("t/esmaul_husna/esmaul_husna_playlist_data.json", "eh", "✨ İşaret Dili ile Esma-i Hüsna", "#7ab0d0")
+        with se_tabs[2]:
+            _playlist_tab("t/radio_theater/radio_theater_playlist_data.json", "rt", "🎭 Diyanet Radyo Tiyatrosu", "#d08050")
+        with se_tabs[3]:
+            _playlist_tab("t/dijital_sozluk/dijital_sozluk_playlist_data.json", "ds", "📖 Dijital Sözlük", "#80c0a0")
+        with se_tabs[4]:
+            _playlist_tab("t/musiki/musiki_playlist_data.json", "mu", "🎵 Dini Musiki", "#a090d0")
+        with se_tabs[5]:
+            _playlist_tab("t/elif_ba/elif_ba_playlist_data.json", "eb", "🔤 Elif Bâ", "#d0a060")
+        with se_tabs[6]:
+            _playlist_tab("t/oruc/oruc_playlist_data.json", "or", "🌙 Oruç Dersleri", "#60a0c0")
+
+        # 40 Ayette Kuran — ayet konu kartları
+        if os.path.exists("t/ayah/40_ayet_data.json"):
+            st.markdown('<br><div style="color:#c8a84b;font-size:1.1em;border-bottom:1px solid #1e3d64;padding-bottom:5px;margin-bottom:15px;">📖 40 Ayette Birlikte Yaşama Ahlakı</div>', unsafe_allow_html=True)
+            with open("t/ayah/40_ayet_data.json", "r", encoding="utf-8") as f:
+                _ayet40 = json.load(f)
+            for _konu in _ayet40:
+                _konu_adi = _konu.get("Konu", "")
+                _ayetler  = _konu.get("Ayetler", [])
+                with st.expander(f"📌 {_konu_adi} ({len(_ayetler)} ayet)"):
+                    for _a in _ayetler:
+                        _metin  = _a.get("Metin", "")
+                        _kaynak = _a.get("Kaynak", "")
+                        _arapca = _a.get("Arapca", "") or _a.get("Arabic", "")
+                        if _arapca:
+                            st.markdown(f'<div style="font-family:Amiri,serif;font-size:1.4em;color:#c8a84b;direction:rtl;text-align:right;margin-bottom:6px;">{_arapca}</div>', unsafe_allow_html=True)
+                        if _metin:
+                            st.markdown(f'<div style="color:#a0c0d8;font-size:0.9em;line-height:1.7;margin-bottom:4px;">{_metin}</div>', unsafe_allow_html=True)
+                        if _kaynak:
+                            st.caption(f"📍 {_kaynak}")
+                        st.divider()
+
+
 
     # ── İŞİTSEL ──
     with lib_tabs[2]:
