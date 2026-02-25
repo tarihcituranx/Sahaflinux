@@ -645,45 +645,64 @@ def diyanet_key() -> str:
     auth = h.get("Authorization", "")
     return auth.replace("Bearer ", "").strip()
 
+# ─── Diyanet API response formatları (schema'ya göre):
+# GET /api/v1/chapters          → {"data": [ChapterResource], "meta": {...}}
+# GET /api/v1/chapters/{id}     → [VerseResource]  (direkt array, wrapper YOK)
+# GET /api/v1/juz/{id}          → [VerseResource]  (direkt array, wrapper YOK)
+# GET /api/v1/verses/page/{n}   → {"data": [VerseResource], "meta": {...}, "success": bool}
+#
+# ChapterResource: id, name_turkish, name_arabic, verse_count, revelation_order, first_page
+# VerseResource:   id, surah_number, verse_number, text, arabic_text,
+#                  juz_number, page_number, surah_name_turkish, surah_name_arabic
+
 @st.cache_data(ttl=86400)
 def diy_sureler(api_key: str):
-    """Tüm sure listesini Diyanet API'den çek — api_key parametre olarak alır (cache uyumlu)"""
+    """GET /api/v1/chapters → {data: [ChapterResource]}"""
     if not api_key:
         return []
     h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
-        r = requests.get(f"{DIYANET_URL}/api/v1/chapters", headers=h, params={"language": "tr"}, timeout=10)
+        r = requests.get(
+            f"{DIYANET_URL}/api/v1/chapters",
+            headers=h, params={"language": "tr"}, timeout=10
+        )
         if r.ok:
+            # Response: {"data": [...], "meta": {...}}
             veri = r.json()
-            lst = veri.get("data", veri) if isinstance(veri, dict) else veri
-            if isinstance(lst, list):
-                return lst
+            lst = veri.get("data", []) if isinstance(veri, dict) else veri
+            return lst if isinstance(lst, list) else []
     except Exception:
         pass
     return []
 
 @st.cache_data(ttl=86400)
 def diy_sure_getir(chapter_id: int, api_key: str):
-    """Sure ayetlerini Diyanet API'den çek"""
+    """GET /api/v1/chapters/{chapter_id} → [VerseResource] (direkt array)"""
     if not api_key:
         return None
     h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
             f"{DIYANET_URL}/api/v1/chapters/{chapter_id}",
-            headers=h, params={"language_id": 1}, timeout=15
+            headers=h,
+            params={"language_id": 1, "arabic_text_group_id": 1},
+            timeout=15
         )
         if r.ok:
             veri = r.json()
-            ayetler = veri.get("data", veri) if isinstance(veri, dict) else veri
-            return ayetler if isinstance(ayetler, list) else None
+            # Direkt array döner, wrapper yok
+            if isinstance(veri, list):
+                return veri
+            # Yine de dict gelirse data'ya bak
+            if isinstance(veri, dict):
+                return veri.get("data", [])
     except Exception:
         pass
     return None
 
 @st.cache_data(ttl=86400)
 def diy_cuz_getir(juz_id: int, api_key: str):
-    """Cüz ayetlerini Diyanet API'den çek"""
+    """GET /api/v1/juz/{juz_id} → [VerseResource] (direkt array)"""
     if not api_key:
         return None
     h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
@@ -694,25 +713,35 @@ def diy_cuz_getir(juz_id: int, api_key: str):
         )
         if r.ok:
             veri = r.json()
-            return veri.get("data", veri) if isinstance(veri, dict) else veri
+            # Direkt array döner
+            if isinstance(veri, list):
+                return veri
+            if isinstance(veri, dict):
+                return veri.get("data", [])
     except Exception:
         pass
     return None
 
 @st.cache_data(ttl=86400)
 def diy_sayfa_getir(sayfa: int, api_key: str):
-    """Sayfa ayetlerini Diyanet API'den çek (1-604)"""
+    """GET /api/v1/verses/page/{page_number} → {data: [VerseResource], meta, success}"""
     if not api_key:
         return None
     h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
             f"{DIYANET_URL}/api/v1/verses/page/{sayfa}",
-            headers=h, params={"language_id": 1}, timeout=12
+            headers=h,
+            params={"language_id": 1, "arabic_text_group_id": 1},
+            timeout=12
         )
         if r.ok:
             veri = r.json()
-            return veri.get("data", veri) if isinstance(veri, dict) else veri
+            # Response: {"data": [...], "meta": {...}, "success": true}
+            if isinstance(veri, dict):
+                return veri.get("data", [])
+            if isinstance(veri, list):
+                return veri
     except Exception:
         pass
     return None
@@ -1899,9 +1928,10 @@ with tab3:
             _dkey = diyanet_key()
             _diy_sureler = diy_sureler(_dkey) if _diy else []
             if _diy_sureler:
+                # ChapterResource kesinlikle: id, name_turkish, name_arabic, verse_count, first_page
                 sure_sec_d = {
-                    f"{s.get('id', s.get('number', i+1)):3}. {s.get('name_turkish', s.get('name','?'))}  —  {s.get('name_arabic','')}": s.get('id', s.get('number', i+1))
-                    for i, s in enumerate(_diy_sureler)
+                    f"{s['id']:3}. {s['name_turkish']}  ({s['name_arabic']})  — {s.get('verse_count','?')} ayet": s['id']
+                    for s in _diy_sureler
                 }
                 _secili_sure_str = st.selectbox("Sure Seç", list(sure_sec_d.keys()), index=0, key="diy_sure_sb")
                 _secili_sure_no  = sure_sec_d[_secili_sure_str]
@@ -1930,29 +1960,40 @@ with tab3:
             if _sure_icerik:
                 if _diy and isinstance(_sure_icerik, list):
                     # Diyanet formatı: [VerseResource, ...]
-                    _sure_adi_goster = _sure_icerik[0].get("surah_name_turkish","") if _sure_icerik else ""
-                    _sure_adi_ar_g   = _sure_icerik[0].get("surah_name_arabic","") if _sure_icerik else ""
+                    # VerseResource: surah_name_turkish, surah_name_arabic, verse_number, surah_number
+                    _sure_adi_goster = _sure_icerik[0].get("surah_name_turkish", "") if _sure_icerik else ""
+                    _sure_adi_ar_g   = _sure_icerik[0].get("surah_name_arabic", "") if _sure_icerik else ""
+                    _vahiy_bilgi = ""
                     st.markdown(f"""
                     <div style="background:#0c1c2e;border:1px solid #1e3d64;border-radius:14px;
                                 padding:16px;text-align:center;margin:10px 0;">
                         <div style="font-family:Amiri,serif;font-size:1.7em;color:#c8a84b;">{_sure_adi_ar_g}</div>
-                        <div style="color:#3a6080;font-size:0.85em;margin-top:4px;">{_sure_adi_goster} • {len(_sure_icerik)} Ayet</div>
+                        <div style="color:#5a8aaa;font-size:1em;margin-top:4px;">{_sure_adi_goster}</div>
+                        <div style="color:#3a6080;font-size:0.82em;margin-top:2px;">{len(_sure_icerik)} Ayet • Sayfa {_sure_icerik[0].get('page_number','?') if _sure_icerik else '?'} • Cüz {_sure_icerik[0].get('juz_number','?') if _sure_icerik else '?'}</div>
                     </div>
                     """, unsafe_allow_html=True)
                     _goster = st.slider("Gösterilecek Ayet", 5, min(50, len(_sure_icerik)), 10, key="diy_sure_sl")
                     for _av in _sure_icerik[:_goster]:
-                        _sno = _av.get("surah_number", _secili_sure_no)
-                        _ano = _av.get("verse_number", 0)
+                        # VerseResource kesin alanlar: surah_number, verse_number, text, arabic_text, juz_number, page_number
+                        _sno   = _av.get("surah_number", _secili_sure_no)
+                        _ano   = _av.get("verse_number", 0)
+                        _metin = _av.get("text", "")
+                        _arapc = _av.get("arabic_text", "")
+                        _juz   = _av.get("juz_number", "?")
+                        _sayfa = _av.get("page_number", "?")
                         _audio = everyayah_url(_sno, _ano, kari_klasor)
                         st.markdown(f"""
                         <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
                                     padding:14px 18px;margin:5px 0;">
-                            <div style="font-size:0.7em;color:#2a5a70;margin-bottom:6px;">{_ano}. Ayet  •  Cüz {_av.get('juz_number','?')}  •  Sayfa {_av.get('page_number','?')}</div>
-                            <div style="font-family:Amiri,serif;font-size:1.6em;color:#c8a84b;direction:rtl;text-align:right;line-height:2;margin-bottom:8px;">{_av.get('arabic_text','')}</div>
-                            <div style="color:#a0c0d8;font-size:0.9em;line-height:1.75;">{_av.get('text','')}</div>
+                            <div style="font-size:0.7em;color:#2a5a70;margin-bottom:6px;">
+                                {_ano}. Ayet &nbsp;•&nbsp; Cüz {_juz} &nbsp;•&nbsp; Sayfa {_sayfa}
+                            </div>
+                            {"<div style='font-family:Amiri,serif;font-size:1.7em;color:#c8a84b;direction:rtl;text-align:right;line-height:2;margin-bottom:10px;'>" + _arapc + "</div>" if _arapc else ""}
+                            <div style="color:#a0c0d8;font-size:0.9em;line-height:1.8;">{_metin}</div>
                         </div>
                         """, unsafe_allow_html=True)
-                        st.audio(_audio, format="audio/mp3")
+                        if _sno and _ano:
+                            st.audio(_audio, format="audio/mp3")
                 else:
                     # alquran.cloud formatı
                     _ayetler = _sure_icerik.get("ayahs", []) if isinstance(_sure_icerik, dict) else []
