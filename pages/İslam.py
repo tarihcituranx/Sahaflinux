@@ -620,6 +620,22 @@ def cuz_getir(cuz_no: int):
     except:
         return None
 
+# Sure → Cüz sabit haritası (API juz_number döndürmediğinde fallback)
+_SURE_CUZ_MAP = {
+    1:1, 2:1, 3:3, 4:4, 5:6, 6:7, 7:8, 8:9, 9:10, 10:11,
+    11:12, 12:12, 13:13, 14:13, 15:14, 16:14, 17:15, 18:15, 19:16, 20:16,
+    21:17, 22:17, 23:18, 24:18, 25:19, 26:19, 27:19, 28:20, 29:20, 30:21,
+    31:21, 32:21, 33:22, 34:22, 35:22, 36:23, 37:23, 38:23, 39:24, 40:24,
+    41:24, 42:25, 43:25, 44:25, 45:25, 46:26, 47:26, 48:26, 49:26, 50:26,
+    51:27, 52:27, 53:27, 54:27, 55:27, 56:27, 57:27, 58:28, 59:28, 60:28,
+    61:28, 62:28, 63:28, 64:28, 65:28, 66:28, 67:29, 68:29, 69:29, 70:29,
+    71:29, 72:29, 73:29, 74:29, 75:29, 76:29, 77:29, 78:30, 79:30, 80:30,
+    81:30, 82:30, 83:30, 84:30, 85:30, 86:30, 87:30, 88:30, 89:30, 90:30,
+    91:30, 92:30, 93:30, 94:30, 95:30, 96:30, 97:30, 98:30, 99:30, 100:30,
+    101:30, 102:30, 103:30, 104:30, 105:30, 106:30, 107:30, 108:30, 109:30,
+    110:30, 111:30, 112:30, 113:30, 114:30,
+}
+
 # ─────────────────────────────────────────────────────────────
 # DİYANET OPEN SOURCE KURAN API
 # ─────────────────────────────────────────────────────────────
@@ -2058,7 +2074,7 @@ with tab3:
                                 padding:16px;text-align:center;margin:10px 0;">
                         <div style="font-family:Amiri,serif;font-size:1.7em;color:#c8a84b;">{_sure_adi_ar_g}</div>
                         <div style="color:#5a8aaa;font-size:1em;margin-top:4px;">{_sure_adi_goster}</div>
-                        <div style="color:#3a6080;font-size:0.82em;margin-top:2px;">{len(_sure_icerik)} Ayet • Sayfa {_sure_icerik[0].get('page_number','?') if _sure_icerik else '?'} • Cüz {_sure_icerik[0].get('juz_number','?') if _sure_icerik else '?'}</div>
+                        <div style="color:#3a6080;font-size:0.82em;margin-top:2px;">{len(_sure_icerik)} Ayet • Sayfa {_sure_icerik[0].get('page_number','?') if _sure_icerik else '?'} • Cüz {_sure_icerik[0].get('juz_number') or _SURE_CUZ_MAP.get(int(_secili_sure_no) if _secili_sure_no else 1, '?') if _sure_icerik else '?'}</div>
                     </div>
                     """, unsafe_allow_html=True)
                     _goster = st.slider("Gösterilecek Ayet Sayısı", 1, len(_sure_icerik), len(_sure_icerik), key="diy_sure_sl")
@@ -2103,10 +2119,13 @@ with tab3:
                         _a_dict = _av.get("arabic_script")
                         _arapc = _a_dict.get("text", "") if isinstance(_a_dict, dict) else _av.get("arabic_text", "")
                         
-                        # API'de ayet bazında cüz bilgisi gelmediğinden sure bazındaki bilgiyi (veya fallback) kullanıyoruz
-                        _juz   = _s_info.get("Cuz", "?") if "_s_info" in locals() and isinstance(_s_info, dict) and "Cuz" in _s_info else _av.get("juz_number", "?")
+                        # Sure→Cüz sabit haritası ile Cüz ? sorununu çöz
+                        _juz   = (_av.get("juz_number")
+                                  or _s_info.get("Cuz") if isinstance(_s_info, dict) else None
+                                  or _SURE_CUZ_MAP.get(int(_sno) if _sno else 1, "?"))
                         _sayfa = _av.get("page_number", "?")
                         _audio = everyayah_url(_sno, _ano, kari_klasor)
+                        _audio_qe = f"https://secure.quranexplorer.com/quran/split-audio/Script/Mishari-Rashid/{int(_sno):03d}-{int(_ano):02d}.mp3" if _sno and _ano else ""
                         st.markdown(f"""
                         <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
                                     padding:14px 18px;margin:5px 0;">
@@ -2118,7 +2137,14 @@ with tab3:
                         </div>
                         """, unsafe_allow_html=True)
                         if _sno and _ano:
-                            st.audio(_audio, format="audio/mp3")
+                            _qe_col, _ea_col = st.columns(2)
+                            with _qe_col:
+                                st.caption("🎙️ Mişari (QuranExplorer)")
+                                st.audio(_audio_qe, format="audio/mp3")
+                            with _ea_col:
+                                if _audio:
+                                    st.caption(f"🔊 {kari_ad}")
+                                    st.audio(_audio, format="audio/mp3")
                 else:
                     # alquran.cloud formatı
                     _ayetler = _sure_icerik.get("ayahs", []) if isinstance(_sure_icerik, dict) else []
@@ -2466,29 +2492,62 @@ with tab5:
                             photo_url = bk.get("photo", "")
                             pdf_url   = bk.get("path", "#")
                             book_name = bk.get("name", "")
-                            # Fotoğraf bozuksa gri arka plan + kitap ikonu göster
-                            img_html = f'''
-                                <div style="height:220px;overflow:hidden;border-radius:6px;margin-bottom:10px;background:#080e1a;display:flex;align-items:center;justify-content:center;">
-                                    <img src="{photo_url}" style="width:100%;height:100%;object-fit:cover;"
-                                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-                                    >
-                                    <div style="display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;color:#3a6080;">
-                                        <div style="font-size:3em;">&#128218;</div>
-                                        <div style="font-size:0.75em;text-align:center;padding:8px;">{book_name[:30]}</div>
-                                    </div>
-                                </div>
-                            '''
+                            # Kart çerçevesi
                             st.markdown(
-                                f'''
-                                <div style="background:#0c1c2e; padding:10px; border-radius:10px; text-align:center; height:100%; border:1px solid #1a3050; margin-bottom:15px;">
-                                    {img_html}
-                                    <div style="font-size:0.85em; font-weight:bold; color:#a0c0d8; min-height:45px; display:flex; align-items:center; justify-content:center;">{book_name}</div>
-                                    <a href="{pdf_url}" target="_blank" style="display:inline-block; margin-top:10px; background:#c8a84b; color:#080e1a; padding:6px 16px; border-radius:6px; text-decoration:none; font-size:0.85em; font-weight:bold;">📖 PDF İndir/Oku</a>
-                                </div>
-                                ''', unsafe_allow_html=True
+                                f'<div style="background:#0c1c2e;padding:8px;border-radius:10px;'
+                                f'border:1px solid #1a3050;margin-bottom:15px;text-align:center;">',
+                                unsafe_allow_html=True
                             )
+                            # Kapak görseli — yüklenemezse Diyanet logo fallback
+                            if photo_url:
+                                st.markdown(
+                                    f'<img src="{photo_url}" style="width:100%;border-radius:6px;'
+                                    f'margin-bottom:8px;max-height:200px;object-fit:cover;" '
+                                    f'onerror="this.src=\'https://diniyayinlar.diyanet.gov.tr/Content/img/logo.png\'">',
+                                    unsafe_allow_html=True
+                                )
+                            else:
+                                st.markdown(
+                                    '<div style="height:160px;background:#080e1a;border-radius:6px;'
+                                    'display:flex;align-items:center;justify-content:center;'
+                                    'font-size:3em;margin-bottom:8px;">📚</div>',
+                                    unsafe_allow_html=True
+                                )
+                            # Kitap adı ve PDF butonu
+                            safe_name = book_name.replace("<","&lt;").replace(">","&gt;")
+                            st.markdown(
+                                f'<div style="font-size:0.82em;font-weight:bold;color:#a0c0d8;'
+                                f'min-height:40px;margin-bottom:8px;">{safe_name}</div>'
+                                f'<a href="{pdf_url}" target="_blank" style="display:inline-block;'
+                                f'background:#c8a84b;color:#080e1a;padding:5px 14px;border-radius:6px;'
+                                f'text-decoration:none;font-size:0.82em;font-weight:bold;">📖 PDF</a>'
+                                f'</div>',
+                                unsafe_allow_html=True
+                            )
+
         else:
-            st.error("Kitaplık dosyaları (books.json veya categories.json) t/kitaplik/ içerisinde bulunamadı.")
+            # Streamlit Cloud: yerel dosya yok → Diyanet online kitaplığına link ver
+            st.info("📚 Kitaplık verileri yerel olarak bulunamadı. Diyanet'in online kitap arşivine yönlendiriliyorsunuz.")
+            st.markdown("""
+            <div style="background:#0c1c2e;border:1px solid #1e3d64;border-radius:14px;padding:20px;text-align:center;">
+                <div style="color:#c8a84b;font-size:1.1em;font-weight:bold;margin-bottom:12px;">🌐 Diyanet Online Kitaplık</div>
+                <a href="https://diniyayinlar.diyanet.gov.tr/" target="_blank"
+                   style="display:inline-block;background:#c8a84b;color:#080e1a;padding:10px 24px;
+                          border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;">
+                    📖 Dini Yayınlar Arşivi
+                </a>
+                <a href="https://webdosya.diyanet.gov.tr/kuran/kuranikerim/dosyalar/document/isamkuran.pdf" target="_blank"
+                   style="display:inline-block;background:#1e3d64;color:#a0c0d8;padding:10px 24px;
+                          border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;">
+                    📄 İsam Kur'an-ı Kerim (PDF)
+                </a>
+                <a href="https://webdosya.diyanet.gov.tr/kuran/kuranikerim/dosyalar/document/40AyetteKuran.pdf" target="_blank"
+                   style="display:inline-block;background:#1e3d64;color:#a0c0d8;padding:10px 24px;
+                          border-radius:8px;text-decoration:none;font-weight:bold;margin:6px;">
+                    📄 40 Ayette Kur'an (PDF)
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
             
     # ── SESLİ ESERLER ──
     with lib_tabs[1]:
