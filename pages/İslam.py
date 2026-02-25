@@ -637,27 +637,37 @@ def diyanet_baslik():
 def diyanet_aktif():
     return diyanet_baslik() is not None
 
-@st.cache_data(ttl=86400)
-def diy_sureler():
-    """Tüm sure listesini Diyanet API'den çek"""
+def diyanet_key() -> str:
+    """Diyanet API key'ini döndür (calls dereference etmek için)"""
     h = diyanet_baslik()
     if not h:
+        return ""
+    auth = h.get("Authorization", "")
+    return auth.replace("Bearer ", "").strip()
+
+@st.cache_data(ttl=86400)
+def diy_sureler(api_key: str):
+    """Tüm sure listesini Diyanet API'den çek — api_key parametre olarak alır (cache uyumlu)"""
+    if not api_key:
         return []
+    h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(f"{DIYANET_URL}/api/v1/chapters", headers=h, params={"language": "tr"}, timeout=10)
         if r.ok:
             veri = r.json()
-            return veri.get("data", veri) if isinstance(veri, dict) else veri
+            lst = veri.get("data", veri) if isinstance(veri, dict) else veri
+            if isinstance(lst, list):
+                return lst
     except Exception:
         pass
     return []
 
 @st.cache_data(ttl=86400)
-def diy_sure_getir(chapter_id: int):
-    """Sure ayetlerini Diyanet API'den çek (Arapça + Türkçe)"""
-    h = diyanet_baslik()
-    if not h:
+def diy_sure_getir(chapter_id: int, api_key: str):
+    """Sure ayetlerini Diyanet API'den çek"""
+    if not api_key:
         return None
+    h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
             f"{DIYANET_URL}/api/v1/chapters/{chapter_id}",
@@ -672,11 +682,11 @@ def diy_sure_getir(chapter_id: int):
     return None
 
 @st.cache_data(ttl=86400)
-def diy_cuz_getir(juz_id: int):
+def diy_cuz_getir(juz_id: int, api_key: str):
     """Cüz ayetlerini Diyanet API'den çek"""
-    h = diyanet_baslik()
-    if not h:
+    if not api_key:
         return None
+    h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
             f"{DIYANET_URL}/api/v1/juz/{juz_id}",
@@ -690,11 +700,11 @@ def diy_cuz_getir(juz_id: int):
     return None
 
 @st.cache_data(ttl=86400)
-def diy_sayfa_getir(sayfa: int):
+def diy_sayfa_getir(sayfa: int, api_key: str):
     """Sayfa ayetlerini Diyanet API'den çek (1-604)"""
-    h = diyanet_baslik()
-    if not h:
+    if not api_key:
         return None
+    h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
             f"{DIYANET_URL}/api/v1/verses/page/{sayfa}",
@@ -1822,7 +1832,7 @@ with tab3:
         if _diy:
             # Diyanet: rastgele sayfa → ilk ayet
             _rand_sayfa = random.randint(1, 604)
-            _sayfa_ayetler = diy_sayfa_getir(_rand_sayfa)
+            _sayfa_ayetler = diy_sayfa_getir(_rand_sayfa, diyanet_key())
             if _sayfa_ayetler and isinstance(_sayfa_ayetler, list) and len(_sayfa_ayetler) > 0:
                 _idx = random.randint(0, min(5, len(_sayfa_ayetler)-1))
                 _a = _sayfa_ayetler[_idx]
@@ -1886,11 +1896,12 @@ with tab3:
         # ── SURE OKUYUCU ──
         with kuran_sekme[0]:
             # Diyanet sure listesi
-            _diy_sureler = diy_sureler() if _diy else []
+            _dkey = diyanet_key()
+            _diy_sureler = diy_sureler(_dkey) if _diy else []
             if _diy_sureler:
                 sure_sec_d = {
-                    f"{s['id']:3}. {s.get('name_turkish','?')}  —  {s.get('name_arabic','')}": s["id"]
-                    for s in _diy_sureler
+                    f"{s.get('id', s.get('number', i+1)):3}. {s.get('name_turkish', s.get('name','?'))}  —  {s.get('name_arabic','')}": s.get('id', s.get('number', i+1))
+                    for i, s in enumerate(_diy_sureler)
                 }
                 _secili_sure_str = st.selectbox("Sure Seç", list(sure_sec_d.keys()), index=0, key="diy_sure_sb")
                 _secili_sure_no  = sure_sec_d[_secili_sure_str]
@@ -1911,7 +1922,7 @@ with tab3:
             if st.button("📖 Sureyi Yükle", use_container_width=True, key="sure_yukle_btn"):
                 with st.spinner("Sure yükleniyor…"):
                     if _diy:
-                        st.session_state[_sure_key] = diy_sure_getir(_secili_sure_no)
+                        st.session_state[_sure_key] = diy_sure_getir(_secili_sure_no, diyanet_key())
                     else:
                         st.session_state[_sure_key] = sureyi_getir(_secili_sure_no)
 
@@ -1978,7 +1989,7 @@ with tab3:
                     ck = f"cuz_d_{cuz_no}"
                     with st.spinner(f"{cuz_no}. Cüz yükleniyor…"):
                         if _diy:
-                            st.session_state[ck] = diy_cuz_getir(cuz_no)
+                            st.session_state[ck] = diy_cuz_getir(cuz_no, diyanet_key())
                         else:
                             _fb = cuz_getir(cuz_no)
                             st.session_state[ck] = _fb.get("ayahs", []) if _fb else []
@@ -2020,7 +2031,7 @@ with tab3:
                     if st.button("📄 Getir", use_container_width=True, key="sayfa_getir_btn"):
                         _sk = f"sayfa_{sayfa_no}"
                         with st.spinner(f"{sayfa_no}. Sayfa yükleniyor…"):
-                            st.session_state[_sk] = diy_sayfa_getir(sayfa_no)
+                            st.session_state[_sk] = diy_sayfa_getir(sayfa_no, diyanet_key())
 
                 _sayfa_ic = st.session_state.get(f"sayfa_{sayfa_no}")
                 if _sayfa_ic and isinstance(_sayfa_ic, list):
