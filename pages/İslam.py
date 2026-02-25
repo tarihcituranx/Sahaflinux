@@ -2214,10 +2214,12 @@ with tab3:
                         _a_dict = _av.get("arabic_script")
                         _arapc = _a_dict.get("text", "") if isinstance(_a_dict, dict) else _av.get("arabic_text", "")
                         
-                        # Sure→Cüz sabit haritası ile Cüz ? sorununu çöz
-                        _juz   = (_av.get("juz_number")
-                                  or _s_info.get("Cuz") if isinstance(_s_info, dict) else None
-                                  or _SURE_CUZ_MAP.get(int(_sno) if _sno else 1, "?"))
+                        # Cüz — API yoksa SURE_CUZ_MAP'ten sağla (parantez kritik!)
+                        _juz = (
+                            _av.get("juz_number")
+                            or (_s_info.get("Cuz") if isinstance(_s_info, dict) else None)
+                            or _SURE_CUZ_MAP.get(int(_sno) if _sno else 1, "?")
+                        )
                         _sayfa = _av.get("page_number", "?")
                         _audio = everyayah_url(_sno, _ano, kari_klasor)
                         _audio_qe = f"https://secure.quranexplorer.com/quran/split-audio/Script/Mishari-Rashid/{int(_sno):03d}-{int(_ano):02d}.mp3" if _sno and _ano else ""
@@ -2232,13 +2234,30 @@ with tab3:
                         </div>
                         """, unsafe_allow_html=True)
                         if _sno and _ano:
+                            # Okuyucu farkı info
+                            with st.expander("ℹ️ Hangi sesi kullansam?", expanded=False):
+                                st.markdown("""
+| Kaynak | Okuyucu | Stil | Kalite |
+|---|---|---|---|
+| 🎙️ **QuranExplorer** | Mişari Raşid el-Afasi | Hafif, akıcı — geniş kitlede en çok tercih | ~500KB/ayet |
+| 🔊 **EveryAyah** | Seçilen okuyucu | Çeşitli stiller (tecvid, murattel, tartil) | ~100KB/ayet |
+                                """)
+                                st.caption("QuranExplorer sesi tarayıcı üzerinden doğrudan çalar. EveryAyah hafif ama daha az okuyucu seçeneği sunar.")
                             _qe_col, _ea_col = st.columns(2)
                             with _qe_col:
-                                st.caption("🎙️ Mişari (QuranExplorer)")
-                                st.audio(_audio_qe, format="audio/mp3")
+                                st.caption("🎙️ Mişari Raşid el-Afasi (QuranExplorer)")
+                                if _audio_qe:
+                                    st.markdown(
+                                        f'<audio controls style="width:100%;margin-top:4px;">'
+                                        f'<source src="{_audio_qe}" type="audio/mpeg">'
+                                        f'</audio>'
+                                        f'<div style="font-size:0.7em;color:#5a8aaa;margin-top:2px;">'
+                                        f'<a href="{_audio_qe}" target="_blank" style="color:#c8a84b;">⬇ İndir/Aç</a></div>',
+                                        unsafe_allow_html=True
+                                    )
                             with _ea_col:
                                 if _audio:
-                                    st.caption(f"🔊 {kari_klasor.replace('_128kbps','').replace('_',' ')}")
+                                    st.caption(f"🔊 {kari_klasor.replace('_128kbps','').replace('_',' ')} (EveryAyah)")
                                     st.audio(_audio, format="audio/mp3")
 
                 else:
