@@ -2238,8 +2238,9 @@ with tab3:
                                 st.audio(_audio_qe, format="audio/mp3")
                             with _ea_col:
                                 if _audio:
-                                    st.caption(f"🔊 {kari_ad}")
+                                    st.caption(f"🔊 {kari_klasor.replace('_128kbps','').replace('_',' ')}")
                                     st.audio(_audio, format="audio/mp3")
+
                 else:
                     # alquran.cloud formatı
                     _ayetler = _sure_icerik.get("ayahs", []) if isinstance(_sure_icerik, dict) else []
