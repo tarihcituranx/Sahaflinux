@@ -293,6 +293,16 @@ IMSAKIYEM   = "https://ezanvakti.imsakiyem.com"   # ANA KAYNAK
 EMUSHAF     = "https://ezanvakti.emushaf.net"      # YEDEK KAYNAK
 RAMADAN_URL = "https://ramadan.munafio.com/api/check"
 QURAN_URL   = "https://api.alquran.cloud/v1"
+DIYANET_URL = "https://t061.diyanet.gov.tr/apigateway/acikkaynakkuran"
+EVERYAYAH   = "https://everyayah.com/data"
+# Sesli okuma kari seçenekleri (everyayah.com klasör adları)
+KARILER = {
+    "Abdulbasit Abdussamed (Murattal)": "Abdul_Basit_Murattal_64kbps",
+    "Mishary Rashid Alafasy":           "Mishary_Rashid_Alafasy_128kbps",
+    "Mahmoud Khalil al-Hussary":        "Husary_128kbps",
+    "Saad Al-Ghamdi":                   "Saad_Al-Ghamdee_128kbps",
+    "Muhammad Siddiq Al-Minshawi":      "Minshawi_Murattal_128kbps",
+}
 NOMINATIM   = "https://nominatim.openstreetmap.org"
 TR_TZ       = pytz.timezone("Europe/Istanbul")
 
@@ -441,13 +451,22 @@ def im_ilceler(state_id: str):
     except:
         return []
 
-@st.cache_data(ttl=3600)
 def im_ara(tip: str, sorgu: str):
-    """tip: countries | states | districts"""
+    """tip: countries | states | districts — cache yok, her sorguda taze sonuç"""
     try:
-        r = requests.get(f"{IMSAKIYEM}/api/locations/search/{tip}", params={"q": sorgu}, timeout=8)
-        return r.json().get("data", []) if r.ok else []
-    except:
+        r = requests.get(
+            f"{IMSAKIYEM}/api/locations/search/{tip}",
+            params={"q": sorgu},
+            timeout=8,
+            headers={"Accept": "application/json"},
+        )
+        if r.ok:
+            veri = r.json()
+            if isinstance(veri, list):
+                return veri
+            return veri.get("data", veri.get("results", []))
+        return []
+    except Exception:
         return []
 
 @st.cache_data(ttl=600)
@@ -600,6 +619,97 @@ def cuz_getir(cuz_no: int):
     except:
         return None
 
+# ─────────────────────────────────────────────────────────────
+# DİYANET OPEN SOURCE KURAN API
+# ─────────────────────────────────────────────────────────────
+def diyanet_baslik():
+    """Diyanet API için Authorization header'ı döndür"""
+    key = ""
+    try:
+        if "DIYANET_API_KEY" in st.secrets:
+            key = str(st.secrets["DIYANET_API_KEY"]).strip()
+    except Exception:
+        pass
+    if not key:
+        key = str(st.session_state.get("diyanet_api_key_input", "")).strip()
+    return {"Authorization": f"Bearer {key}", "Accept": "application/json"} if key else None
+
+def diyanet_aktif():
+    return diyanet_baslik() is not None
+
+@st.cache_data(ttl=86400)
+def diy_sureler():
+    """Tüm sure listesini Diyanet API'den çek"""
+    h = diyanet_baslik()
+    if not h:
+        return []
+    try:
+        r = requests.get(f"{DIYANET_URL}/api/v1/chapters", headers=h, params={"language": "tr"}, timeout=10)
+        if r.ok:
+            veri = r.json()
+            return veri.get("data", veri) if isinstance(veri, dict) else veri
+    except Exception:
+        pass
+    return []
+
+@st.cache_data(ttl=86400)
+def diy_sure_getir(chapter_id: int):
+    """Sure ayetlerini Diyanet API'den çek (Arapça + Türkçe)"""
+    h = diyanet_baslik()
+    if not h:
+        return None
+    try:
+        r = requests.get(
+            f"{DIYANET_URL}/api/v1/chapters/{chapter_id}",
+            headers=h, params={"language_id": 1}, timeout=15
+        )
+        if r.ok:
+            veri = r.json()
+            ayetler = veri.get("data", veri) if isinstance(veri, dict) else veri
+            return ayetler if isinstance(ayetler, list) else None
+    except Exception:
+        pass
+    return None
+
+@st.cache_data(ttl=86400)
+def diy_cuz_getir(juz_id: int):
+    """Cüz ayetlerini Diyanet API'den çek"""
+    h = diyanet_baslik()
+    if not h:
+        return None
+    try:
+        r = requests.get(
+            f"{DIYANET_URL}/api/v1/juz/{juz_id}",
+            headers=h, params={"language_id": 1}, timeout=15
+        )
+        if r.ok:
+            veri = r.json()
+            return veri.get("data", veri) if isinstance(veri, dict) else veri
+    except Exception:
+        pass
+    return None
+
+@st.cache_data(ttl=86400)
+def diy_sayfa_getir(sayfa: int):
+    """Sayfa ayetlerini Diyanet API'den çek (1-604)"""
+    h = diyanet_baslik()
+    if not h:
+        return None
+    try:
+        r = requests.get(
+            f"{DIYANET_URL}/api/v1/verses/page/{sayfa}",
+            headers=h, params={"language_id": 1}, timeout=12
+        )
+        if r.ok:
+            veri = r.json()
+            return veri.get("data", veri) if isinstance(veri, dict) else veri
+    except Exception:
+        pass
+    return None
+
+def everyayah_url(sure_no: int, ayet_no: int, kari_klasor: str) -> str:
+    return f"{EVERYAYAH}/{kari_klasor}/{sure_no:03d}{ayet_no:03d}.mp3"
+
 @st.cache_data(ttl=3600)
 def ters_geocode(lat: float, lng: float):
     try:
@@ -715,8 +825,12 @@ def im_vakit_normalize(v: dict) -> dict:
     else:
         hicri_str = ""
 
-    # Eğer hicri_str hâlâ ISO tarih formatındaysa veya boşsa Aladdin API'sini dene
-    if hicri_str and ("T" in hicri_str or len(hicri_str) < 4):
+    # ISO tarih formatı, sadece sayı/tire, veya çok kısa ise temizle
+    if hicri_str and (
+        "T" in hicri_str or
+        "Z" in hicri_str or
+        (len(hicri_str) <= 10 and hicri_str.count("-") >= 2)
+    ):
         hicri_str = ""
 
     return {
@@ -1149,9 +1263,30 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── GROQ API ANAHTARI ──
+    # ── DİYANET API ANAHTARI ──
     st.divider()
-    with st.expander("🤖 Groq API Anahtarı", expanded=not bool(groq_api_key_al())):
+    with st.expander("📖 Diyanet Kuran API Anahtarı", expanded=not bool(diyanet_aktif())):
+        st.markdown('<p style="font-size:0.78em;color:#4a6a8a;">Resmi Diyanet Kuran API icin JWT token. <a href="https://t061.diyanet.gov.tr" target="_blank" style="color:#c8a84b;">Portal -></a></p>', unsafe_allow_html=True)
+        _dkey = st.text_input(
+            "Diyanet API Key",
+            type="password",
+            value=st.session_state.get("diyanet_api_key_input", ""),
+            key="diyanet_api_key_widget",
+            placeholder="eyJ...",
+            label_visibility="collapsed",
+        )
+        if _dkey != st.session_state.get("diyanet_api_key_input", ""):
+            st.session_state.diyanet_api_key_input = _dkey
+            # Diyanet cache'i temizle
+            diy_sureler.clear()
+            st.rerun()
+        if diyanet_aktif():
+            st.success("✅ Diyanet API aktif")
+        else:
+            st.caption("⚠️ Girilmezse alquran.cloud fallback kullanılır.")
+
+    # ── GROQ API ANAHTARI ──
+    with st.expander("🤖 Groq AI Anahtarı", expanded=not bool(groq_api_key_al())):
         st.markdown('<p style="font-size:0.78em;color:#4a6a8a;">Yapay zeka asistanı için gerekli. <a href="https://console.groq.com/keys" target="_blank" style="color:#c8a84b;">Buradan alın →</a></p>', unsafe_allow_html=True)
         _key = st.text_input(
             "API Anahtarı",
@@ -1221,13 +1356,24 @@ ramazan_mi   = (
 # ─────────────────────────────────────────────────────────────
 hicri_str = ""
 if bugun_vakit:
-    hicri_str = bugun_vakit.get("hicri_str", "")
-    # API'den boş veya bozuk geldiyse Aladhan API'sini kullan
-    if not hicri_str or "T" in hicri_str or len(hicri_str) < 5:
+    _raw_hicri = bugun_vakit.get("hicri_str", "")
+    # ISO string, salt tarih ya da boşsa temizle
+    _bozuk = (
+        not _raw_hicri or
+        "T" in _raw_hicri or
+        "Z" in _raw_hicri or
+        (len(_raw_hicri) <= 10 and _raw_hicri.count("-") >= 2)
+    )
+    if not _bozuk:
+        hicri_str = _raw_hicri
+    else:
+        # Aladhan API'den çek
         _h_iso = bugun_vakit.get("tarih_iso") or bugun_iso
         hicri_str = hicri_tarih_getir(_h_iso)
-if not hicri_str:
-    hicri_str = "—"
+
+# Hâlâ boşsa Miladi tarihi Türkçe göster
+if not hicri_str or hicri_str == "—":
+    hicri_str = tr_tarih_format(now_tr)
 miladi_str = tr_tarih_format(now_tr)
 saat_str   = now_tr.strftime("%H:%M:%S")
 
@@ -1291,8 +1437,17 @@ with tab1:
         with btn_col:
             ara_btn = st.button("🔍 Ara", key="tab1_ara_btn", use_container_width=True)
 
-        if konum_ara.strip() and (ara_btn or len(konum_ara) > 2):
-            sonuclar_ara = im_ara("districts", konum_ara.strip())
+        # Arama: sadece buton basıldığında çalış, sonucu session'a kaydet
+        if ara_btn and konum_ara.strip():
+            with st.spinner("Aranıyor…"):
+                _res = im_ara("districts", konum_ara.strip())
+            st.session_state["ara_sonuclari"] = _res
+            st.session_state["ara_sorgu_son"] = konum_ara.strip()
+
+        sonuclar_ara = st.session_state.get("ara_sonuclari", [])
+        ara_sorgu_son = st.session_state.get("ara_sorgu_son", "")
+
+        if ara_sorgu_son:
             if sonuclar_ara:
                 s_display_ara = [
                     f"{r.get('name','')}  —  {r.get('state_id',{}).get('name','') if isinstance(r.get('state_id'),dict) else ''}"
@@ -1305,10 +1460,12 @@ with tab1:
                     st.session_state.ilce_id   = sec["_id"]
                     st.session_state.konum_adi = f"📍 {secim_ara.replace('  —  ', ' / ')}"
                     st.session_state.kaynak    = "imsakiyem"
+                    st.session_state["ara_sonuclari"] = []
+                    st.session_state["ara_sorgu_son"] = ""
                     im_vakitler.clear()
                     st.rerun()
             else:
-                st.caption("⚠️ Sonuç bulunamadı, başka bir isim deneyin.")
+                st.caption(f"⚠️ '{ara_sorgu_son}' için sonuç bulunamadı. İngilizce veya farklı yazımı deneyin (örn: Atakum, Besiktas).")
 
         st.markdown('<hr style="border-color:#1a3050;margin:10px 0">', unsafe_allow_html=True)
         st.markdown('<p style="font-size:0.78em;color:#3a5a70;">Ya da listeden seçin:</p>', unsafe_allow_html=True)
@@ -1636,141 +1793,253 @@ with tab2:
             """, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
-# TAB 3 — KURAN-I KERİM
+# TAB 3 — KURAN-I KERİM  (Ana: Diyanet API → Fallback: alquran.cloud)
 # ══════════════════════════════════════════════════════════════
 with tab3:
+
+    # Kaynak durumu
+    _diy = diyanet_aktif()
+    if _diy:
+        st.markdown('<div class="uyari-not">🟢 <strong>Diyanet Açık Kaynak Kuran API</strong> aktif — Resmi Türkçe çeviri + Arapça metin kullanılıyor.</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="uyari-not">🟡 Diyanet API anahtarı girilmedi — <strong>alquran.cloud</strong> yedek kaynağı kullanılıyor. Sol panelden Diyanet API anahtarı ekleyebilirsiniz.</div>', unsafe_allow_html=True)
+
+    # Kari seçimi (sesli okuma için)
+    kari_adi = st.selectbox("🎧 Kari Seç (Sesli Okuma)", list(KARILER.keys()), key="kari_secim")
+    kari_klasor = KARILER[kari_adi]
+
+    st.markdown("---")
     col_sol, col_sag = st.columns([1, 2])
 
+    # ── GÜNÜN AYETİ ──
     with col_sol:
         st.markdown('<div class="bolum-baslik">✨ Günün Ayeti</div>', unsafe_allow_html=True)
-
         random.seed(st.session_state.ayet_tohumu)
-        rand_ayet_no = random.randint(1, 6236)
-        ayet_veri = ayet_getir(rand_ayet_no)
 
-        if ayet_veri:
-            ar       = ayet_veri.get("ar", {})
-            tr_v     = ayet_veri.get("tr", {})
-            sure_inf = tr_v.get("surah", {})
-            sure_adi_ar  = sure_inf.get("name", "")
-            sure_no_v    = sure_inf.get("number", "")
-            sure_en_adi  = sure_inf.get("englishName", "")
-            sure_en_anlm = sure_inf.get("englishNameTranslation", "")
-            ayet_no_s    = tr_v.get("numberInSurah", "")
-            arapca_metin = ar.get("text", "")
-            turkce_metin = tr_v.get("text", "")
+        _arapca = _turkce = _sure_adi_ar = _sure_adi_tr = ""
+        _sure_no = _ayet_no = 0
 
-            # Sure anlamı Türkçe
-            sk = f"sure_anlam_{sure_no_v}"
-            if sk not in st.session_state and sure_en_anlm:
-                st.session_state[sk] = groq_cevir(f"{sure_en_adi} ({sure_en_anlm})")
-            sure_anlam_tr = st.session_state.get(sk, sure_en_anlm)
+        if _diy:
+            # Diyanet: rastgele sayfa → ilk ayet
+            _rand_sayfa = random.randint(1, 604)
+            _sayfa_ayetler = diy_sayfa_getir(_rand_sayfa)
+            if _sayfa_ayetler and isinstance(_sayfa_ayetler, list) and len(_sayfa_ayetler) > 0:
+                _idx = random.randint(0, min(5, len(_sayfa_ayetler)-1))
+                _a = _sayfa_ayetler[_idx]
+                _arapca    = _a.get("arabic_text", "")
+                _turkce    = _a.get("text", "")
+                _sure_adi_tr = _a.get("surah_name_turkish", "")
+                _sure_adi_ar = _a.get("surah_name_arabic", "")
+                _sure_no   = _a.get("surah_number", 0)
+                _ayet_no   = _a.get("verse_number", 0)
 
+        if not _turkce:
+            # Fallback: alquran.cloud
+            _rand_no = random.randint(1, 6236)
+            _av = ayet_getir(_rand_no)
+            if _av:
+                _arapca  = _av.get("ar", {}).get("text", "")
+                _turkce  = _av.get("tr", {}).get("text", "")
+                _sinf    = _av.get("tr", {}).get("surah", {})
+                _sure_adi_ar = _sinf.get("name", "")
+                _sure_no = _sinf.get("number", 0)
+                _ayet_no = _av.get("tr", {}).get("numberInSurah", 0)
+                _sure_adi_tr = groq_cevir(_sinf.get("englishName", "")) if _sinf.get("englishName") else ""
+
+        if _turkce:
             st.markdown(f"""
             <div class="ayet-kutu">
-                <div class="ayet-arapca">{arapca_metin}</div>
-                <div class="ayet-turkce">"{turkce_metin}"</div>
+                <div class="ayet-arapca">{_arapca}</div>
+                <div class="ayet-turkce">"{_turkce}"</div>
                 <div class="ayet-kaynak">
-                    📖 {sure_adi_ar} Suresi — {sure_anlam_tr}<br>
-                    {sure_no_v}. Sure, {ayet_no_s}. Ayet
+                    📖 {_sure_adi_ar} — {_sure_adi_tr}<br>
+                    {_sure_no}. Sure, {_ayet_no}. Ayet
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            tefsir_key = f"tefsir_{sure_no_v}_{ayet_no_s}"
-            if tefsir_key not in st.session_state:
+            # Sesli okuma
+            if _sure_no and _ayet_no:
+                audio_url = everyayah_url(_sure_no, _ayet_no, kari_klasor)
+                st.markdown(f'<div style="font-size:0.75em;color:#4a7a9b;margin:6px 0 2px;">🎧 {kari_adi}</div>', unsafe_allow_html=True)
+                st.audio(audio_url, format="audio/mp3")
+
+            # Tefsir
+            _tefsir_key = f"tefsir_{_sure_no}_{_ayet_no}"
+            if _tefsir_key not in st.session_state and groq_api_key_al():
                 with st.spinner("Açıklama hazırlanıyor…"):
-                    st.session_state[tefsir_key] = groq_sor(
-                        [{"role": "user", "content": f"{sure_no_v}. sure ({sure_adi_ar}), {ayet_no_s}. ayet hakkında kısa ve anlaşılır bir açıklama yaz. Türkçe olsun, 3-4 cümle yeterli."}],
-                        sistem="Sen İslami bilgiye hakim, Türkçe konuşan bir din asistanısın. Kısa, sade ve anlaşılır açıklamalar yaparsın.",
+                    st.session_state[_tefsir_key] = groq_sor(
+                        [{"role": "user", "content": f"{_sure_no}. sure ({_sure_adi_ar}), {_ayet_no}. ayet hakkında kısa ve anlaşılır bir açıklama yaz. 3-4 cümle."}],
+                        sistem="Sen İslami bilgiye hakim, Türkçe konuşan bir din asistanısın.",
                     )
-            st.markdown('<div class="bolum-baslik">📝 Kısa Açıklama</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="sohbet-kutu">{st.session_state[tefsir_key]}</div>', unsafe_allow_html=True)
+            if _tefsir_key in st.session_state:
+                st.markdown('<div class="bolum-baslik">📝 Açıklama</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="sohbet-kutu">{st.session_state[_tefsir_key]}</div>', unsafe_allow_html=True)
         else:
             st.warning("Ayet yüklenemedi, 'Yeni Ayet' butonuna basın.")
 
+    # ── SAĞ KOLON ──
     with col_sag:
-        st.markdown('<div class="bolum-baslik">📚 Sure Okuyucu</div>', unsafe_allow_html=True)
-        sure_listesi = sure_listesi_getir()
-        if sure_listesi:
-            sure_sec = {
-                f"{s['number']:3}. {s['name']}  —  {s.get('englishName','')}": s["number"]
-                for s in sure_listesi
-            }
-            secili_sure_str = st.selectbox("Sure Seç", list(sure_sec.keys()), index=0)
-            secili_sure_no  = sure_sec[secili_sure_str]
-            sure_key        = f"sure_{secili_sure_no}"
 
-            if st.button("📖 Sureyi Yükle", use_container_width=True):
+        kuran_sekme = st.tabs(["📚 Sure Okuyucu", "📋 Cüz Okuyucu", "📄 Sayfa Okuyucu"])
+
+        # ── SURE OKUYUCU ──
+        with kuran_sekme[0]:
+            # Diyanet sure listesi
+            _diy_sureler = diy_sureler() if _diy else []
+            if _diy_sureler:
+                sure_sec_d = {
+                    f"{s['id']:3}. {s.get('name_turkish','?')}  —  {s.get('name_arabic','')}": s["id"]
+                    for s in _diy_sureler
+                }
+                _secili_sure_str = st.selectbox("Sure Seç", list(sure_sec_d.keys()), index=0, key="diy_sure_sb")
+                _secili_sure_no  = sure_sec_d[_secili_sure_str]
+            else:
+                # Fallback: alquran.cloud sure listesi
+                _fb_sureler = sure_listesi_getir()
+                if _fb_sureler:
+                    sure_sec_d = {
+                        f"{s['number']:3}. {s.get('name','')}  —  {s.get('englishName','')}": s["number"]
+                        for s in _fb_sureler
+                    }
+                    _secili_sure_str = st.selectbox("Sure Seç", list(sure_sec_d.keys()), index=0, key="fb_sure_sb")
+                    _secili_sure_no  = sure_sec_d[_secili_sure_str]
+                else:
+                    _secili_sure_no = 1
+
+            _sure_key = f"sure_d_{_secili_sure_no}"
+            if st.button("📖 Sureyi Yükle", use_container_width=True, key="sure_yukle_btn"):
                 with st.spinner("Sure yükleniyor…"):
-                    st.session_state[sure_key] = sureyi_getir(secili_sure_no)
+                    if _diy:
+                        st.session_state[_sure_key] = diy_sure_getir(_secili_sure_no)
+                    else:
+                        st.session_state[_sure_key] = sureyi_getir(_secili_sure_no)
 
-            sure_icerik = st.session_state.get(sure_key)
-            if sure_icerik:
-                ayetler   = sure_icerik.get("ayahs", [])
-                vahiy     = sure_icerik.get("revelationType", "")
-                vahiy_tr  = "Mekke'de İnen" if vahiy == "Meccan" else "Medine'de İnen" if vahiy == "Medinan" else vahiy
-                s_en_anlm = sure_icerik.get("englishNameTranslation", "")
-                s_ak      = f"sure_anlam_{secili_sure_no}"
-                if s_ak not in st.session_state and s_en_anlm:
-                    st.session_state[s_ak] = groq_cevir(s_en_anlm)
-                s_anlam = st.session_state.get(s_ak, s_en_anlm)
-
-                st.markdown(f"""
-                <div style="background:#0c1c2e;border:1px solid #1e3d64;border-radius:14px;
-                            padding:16px;text-align:center;margin:10px 0;">
-                    <div style="font-family:Amiri,serif;font-size:1.7em;color:#c8a84b;">
-                        {sure_icerik.get('name','')}
-                    </div>
-                    <div style="color:#3a6080;font-size:0.85em;margin-top:4px;">
-                        {s_anlam} • {sure_icerik.get('numberOfAyahs','?')} Ayet • {vahiy_tr}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                goster = st.slider("Gösterilecek Ayet Sayısı", 5, min(50, len(ayetler)), 10)
-                for ayet in ayetler[:goster]:
+            _sure_icerik = st.session_state.get(_sure_key)
+            if _sure_icerik:
+                if _diy and isinstance(_sure_icerik, list):
+                    # Diyanet formatı: [VerseResource, ...]
+                    _sure_adi_goster = _sure_icerik[0].get("surah_name_turkish","") if _sure_icerik else ""
+                    _sure_adi_ar_g   = _sure_icerik[0].get("surah_name_arabic","") if _sure_icerik else ""
                     st.markdown(f"""
-                    <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
-                                padding:14px 18px;margin:5px 0;">
-                        <div style="font-size:0.7em;color:#2a5a70;margin-bottom:5px;">
-                            {sure_icerik.get('name','')} — {ayet.get('numberInSurah','')}. Ayet
-                        </div>
-                        <div style="color:#a0c0d8;font-size:0.9em;line-height:1.75;">
-                            {ayet.get('text','')}
-                        </div>
+                    <div style="background:#0c1c2e;border:1px solid #1e3d64;border-radius:14px;
+                                padding:16px;text-align:center;margin:10px 0;">
+                        <div style="font-family:Amiri,serif;font-size:1.7em;color:#c8a84b;">{_sure_adi_ar_g}</div>
+                        <div style="color:#3a6080;font-size:0.85em;margin-top:4px;">{_sure_adi_goster} • {len(_sure_icerik)} Ayet</div>
                     </div>
                     """, unsafe_allow_html=True)
-
-        st.markdown('<div class="bolum-baslik">📋 Cüz Okuyucu</div>', unsafe_allow_html=True)
-        ca, cb = st.columns([2, 1])
-        with ca:
-            cuz_no = st.number_input("Cüz Numarası (1–30)", 1, 30, 30)
-        with cb:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📋 Getir", use_container_width=True):
-                ck = f"cuz_{cuz_no}"
-                with st.spinner(f"{cuz_no}. Cüz yükleniyor…"):
-                    st.session_state[ck] = cuz_getir(cuz_no)
-
-        cuz_ic = st.session_state.get(f"cuz_{cuz_no}")
-        if cuz_ic:
-            cuz_ayetler = cuz_ic.get("ayahs", [])
-            st.success(f"✅ {cuz_no}. Cüz — {len(cuz_ayetler)} ayet")
-            goster_c = st.slider("Gösterilecek Ayet", 5, min(20, len(cuz_ayetler)), 5, key="cs")
-            for ayet in cuz_ayetler[:goster_c]:
-                sure_ad_c = ayet.get("surah", {}).get("name", "")
-                st.markdown(f"""
-                <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
-                            padding:12px 16px;margin:4px 0;">
-                    <div style="font-size:0.7em;color:#2a5a70;">
-                        {sure_ad_c} — {ayet.get('numberInSurah','')}. Ayet
+                    _goster = st.slider("Gösterilecek Ayet", 5, min(50, len(_sure_icerik)), 10, key="diy_sure_sl")
+                    for _av in _sure_icerik[:_goster]:
+                        _sno = _av.get("surah_number", _secili_sure_no)
+                        _ano = _av.get("verse_number", 0)
+                        _audio = everyayah_url(_sno, _ano, kari_klasor)
+                        st.markdown(f"""
+                        <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
+                                    padding:14px 18px;margin:5px 0;">
+                            <div style="font-size:0.7em;color:#2a5a70;margin-bottom:6px;">{_ano}. Ayet  •  Cüz {_av.get('juz_number','?')}  •  Sayfa {_av.get('page_number','?')}</div>
+                            <div style="font-family:Amiri,serif;font-size:1.6em;color:#c8a84b;direction:rtl;text-align:right;line-height:2;margin-bottom:8px;">{_av.get('arabic_text','')}</div>
+                            <div style="color:#a0c0d8;font-size:0.9em;line-height:1.75;">{_av.get('text','')}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.audio(_audio, format="audio/mp3")
+                else:
+                    # alquran.cloud formatı
+                    _ayetler = _sure_icerik.get("ayahs", []) if isinstance(_sure_icerik, dict) else []
+                    _vahiy   = _sure_icerik.get("revelationType","") if isinstance(_sure_icerik, dict) else ""
+                    _vahiy_tr= "Mekke'de İnen" if _vahiy=="Meccan" else "Medine'de İnen" if _vahiy=="Medinan" else _vahiy
+                    st.markdown(f"""
+                    <div style="background:#0c1c2e;border:1px solid #1e3d64;border-radius:14px;
+                                padding:16px;text-align:center;margin:10px 0;">
+                        <div style="font-family:Amiri,serif;font-size:1.7em;color:#c8a84b;">{_sure_icerik.get('name','') if isinstance(_sure_icerik,dict) else ''}</div>
+                        <div style="color:#3a6080;font-size:0.85em;margin-top:4px;">{_sure_icerik.get('numberOfAyahs','?') if isinstance(_sure_icerik,dict) else '?'} Ayet • {_vahiy_tr}</div>
                     </div>
-                    <div style="color:#a0c0d8;font-size:0.88em;line-height:1.7;margin-top:4px;">
-                        {ayet.get('text','')}
+                    """, unsafe_allow_html=True)
+                    _goster = st.slider("Gösterilecek Ayet", 5, min(50, len(_ayetler)), 10, key="fb_sure_sl")
+                    for _av in _ayetler[:_goster]:
+                        _ano = _av.get("numberInSurah", 0)
+                        _audio = everyayah_url(_secili_sure_no, _ano, kari_klasor)
+                        st.markdown(f"""
+                        <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
+                                    padding:14px 18px;margin:5px 0;">
+                            <div style="font-size:0.7em;color:#2a5a70;margin-bottom:6px;">{_ano}. Ayet</div>
+                            <div style="color:#a0c0d8;font-size:0.9em;line-height:1.75;">{_av.get('text','')}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        st.audio(_audio, format="audio/mp3")
+
+        # ── CÜZ OKUYUCU ──
+        with kuran_sekme[1]:
+            ca, cb = st.columns([2, 1])
+            with ca:
+                cuz_no = st.number_input("Cüz Numarası (1–30)", 1, 30, 1, key="cuz_no_inp")
+            with cb:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📋 Getir", use_container_width=True, key="cuz_getir_btn"):
+                    ck = f"cuz_d_{cuz_no}"
+                    with st.spinner(f"{cuz_no}. Cüz yükleniyor…"):
+                        if _diy:
+                            st.session_state[ck] = diy_cuz_getir(cuz_no)
+                        else:
+                            _fb = cuz_getir(cuz_no)
+                            st.session_state[ck] = _fb.get("ayahs", []) if _fb else []
+
+            cuz_ic = st.session_state.get(f"cuz_d_{cuz_no}")
+            if cuz_ic:
+                _cuz_ayetler = cuz_ic if isinstance(cuz_ic, list) else cuz_ic.get("ayahs", [])
+                st.success(f"✅ {cuz_no}. Cüz — {len(_cuz_ayetler)} ayet")
+                _goster_c = st.slider("Gösterilecek Ayet", 5, min(20, len(_cuz_ayetler)), 5, key="cuz_sl")
+                for _cav in _cuz_ayetler[:_goster_c]:
+                    # Diyanet & alquran.cloud uyumlu alan isimleri
+                    _c_sure_adi = _cav.get("surah_name_turkish") or _cav.get("surah", {}).get("name", "")
+                    _c_sno = _cav.get("surah_number") or (_cav.get("surah", {}).get("number", 0))
+                    _c_ano = _cav.get("verse_number") or _cav.get("numberInSurah", 0)
+                    _c_arapca = _cav.get("arabic_text", "")
+                    _c_turkce = _cav.get("text", "")
+                    _c_audio  = everyayah_url(_c_sno, _c_ano, kari_klasor)
+                    st.markdown(f"""
+                    <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
+                                padding:12px 16px;margin:4px 0;">
+                        <div style="font-size:0.7em;color:#2a5a70;">{_c_sure_adi} — {_c_ano}. Ayet</div>
+                        {"<div style='font-family:Amiri,serif;font-size:1.4em;color:#c8a84b;direction:rtl;text-align:right;line-height:2;margin:6px 0;'>" + _c_arapca + "</div>" if _c_arapca else ""}
+                        <div style="color:#a0c0d8;font-size:0.88em;line-height:1.7;margin-top:4px;">{_c_turkce}</div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
+                    if _c_sno and _c_ano:
+                        st.audio(_c_audio, format="audio/mp3")
+
+        # ── SAYFA OKUYUCU (Sadece Diyanet API'de) ──
+        with kuran_sekme[2]:
+            if not _diy:
+                st.info("📖 Sayfa okuyucu yalnızca Diyanet API anahtarı ile kullanılabilir. Sol panelden ekleyin.")
+            else:
+                sayfa_col1, sayfa_col2 = st.columns([2, 1])
+                with sayfa_col1:
+                    sayfa_no = st.number_input("Sayfa Numarası (1–604)", 1, 604, 1, key="sayfa_no_inp")
+                with sayfa_col2:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("📄 Getir", use_container_width=True, key="sayfa_getir_btn"):
+                        _sk = f"sayfa_{sayfa_no}"
+                        with st.spinner(f"{sayfa_no}. Sayfa yükleniyor…"):
+                            st.session_state[_sk] = diy_sayfa_getir(sayfa_no)
+
+                _sayfa_ic = st.session_state.get(f"sayfa_{sayfa_no}")
+                if _sayfa_ic and isinstance(_sayfa_ic, list):
+                    st.success(f"✅ {sayfa_no}. Sayfa — {len(_sayfa_ic)} ayet")
+                    for _sav in _sayfa_ic:
+                        _s_sno = _sav.get("surah_number", 0)
+                        _s_ano = _sav.get("verse_number", 0)
+                        _s_sadi = _sav.get("surah_name_turkish", "")
+                        _s_audio = everyayah_url(_s_sno, _s_ano, kari_klasor)
+                        st.markdown(f"""
+                        <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
+                                    padding:12px 16px;margin:4px 0;">
+                            <div style="font-size:0.7em;color:#2a5a70;">{_s_sadi} — {_s_ano}. Ayet  •  Cüz {_sav.get('juz_number','?')}</div>
+                            <div style="font-family:Amiri,serif;font-size:1.5em;color:#c8a84b;direction:rtl;text-align:right;line-height:2;margin:6px 0;">{_sav.get('arabic_text','')}</div>
+                            <div style="color:#a0c0d8;font-size:0.88em;line-height:1.7;">{_sav.get('text','')}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        if _s_sno and _s_ano:
+                            st.audio(_s_audio, format="audio/mp3")
 
 # ══════════════════════════════════════════════════════════════
 # TAB 4 — DİNİ ASİSTAN
