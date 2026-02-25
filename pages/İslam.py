@@ -7,6 +7,7 @@ Diğer        : Ramadan API + Al-Quran Cloud (tr.diyanet) + Groq AI
 
 import streamlit as st
 import requests
+import os
 from datetime import datetime, timedelta
 import pytz
 import random
