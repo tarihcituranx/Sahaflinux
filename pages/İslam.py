@@ -623,27 +623,52 @@ def cuz_getir(cuz_no: int):
 # DİYANET OPEN SOURCE KURAN API
 # ─────────────────────────────────────────────────────────────
 def diyanet_baslik():
-    """Diyanet API için Authorization header'ı döndür"""
+    """Diyanet API icin Authorization header — resmi isimler: DIB_KURAN_API_TOKEN, DIB_KURAN_API_BASE_URL"""
     key = ""
+    base_url_override = ""
     try:
-        if "DIYANET_API_KEY" in st.secrets:
+        # Resmi env ismi: DIB_KURAN_API_TOKEN
+        if "DIB_KURAN_API_TOKEN" in st.secrets:
+            key = str(st.secrets["DIB_KURAN_API_TOKEN"]).strip()
+        # Eski isim fallback
+        elif "DIYANET_API_KEY" in st.secrets:
             key = str(st.secrets["DIYANET_API_KEY"]).strip()
+        # Resmi base URL override
+        if "DIB_KURAN_API_BASE_URL" in st.secrets:
+            base_url_override = str(st.secrets["DIB_KURAN_API_BASE_URL"]).strip()
     except Exception:
         pass
     if not key:
         key = str(st.session_state.get("diyanet_api_key_input", "")).strip()
+    if base_url_override:
+        # Session'a kaydet ki fonksiyonlar kullansın
+        st.session_state["_diy_base_url"] = base_url_override.rstrip("/")
     return {"Authorization": f"Bearer {key}", "Accept": "application/json"} if key else None
 
 def diyanet_aktif():
     return diyanet_baslik() is not None
 
 def diyanet_key() -> str:
-    """Diyanet API key'ini döndür (calls dereference etmek için)"""
+    """Diyanet API token'ini döndür"""
     h = diyanet_baslik()
     if not h:
         return ""
     auth = h.get("Authorization", "")
     return auth.replace("Bearer ", "").strip()
+
+def diyanet_base_url() -> str:
+    """Aktif Diyanet base URL (secrets'tan veya default)"""
+    # Önce session state'e kaydedilmiş override'a bak
+    override = st.session_state.get("_diy_base_url", "")
+    if override:
+        return override
+    # secrets'tan direkt oku
+    try:
+        if "DIB_KURAN_API_BASE_URL" in st.secrets:
+            return str(st.secrets["DIB_KURAN_API_BASE_URL"]).strip().rstrip("/")
+    except Exception:
+        pass
+    return DIYANET_URL
 
 # ─── Diyanet API response formatları (schema'ya göre):
 # GET /api/v1/chapters          → {"data": [ChapterResource], "meta": {...}}
@@ -656,14 +681,14 @@ def diyanet_key() -> str:
 #                  juz_number, page_number, surah_name_turkish, surah_name_arabic
 
 @st.cache_data(ttl=86400)
-def diy_sureler(api_key: str):
+def diy_sureler(api_key: str, base_url: str = DIYANET_URL):
     """GET /api/v1/chapters → {data: [ChapterResource]}"""
     if not api_key:
         return []
     h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
-            f"{DIYANET_URL}/api/v1/chapters",
+            f"{base_url}/api/v1/chapters",
             headers=h, params={"language": "tr"}, timeout=10
         )
         if r.ok:
@@ -676,14 +701,14 @@ def diy_sureler(api_key: str):
     return []
 
 @st.cache_data(ttl=86400)
-def diy_sure_getir(chapter_id: int, api_key: str):
+def diy_sure_getir(chapter_id: int, api_key: str, base_url: str = DIYANET_URL):
     """GET /api/v1/chapters/{chapter_id} → [VerseResource] (direkt array)"""
     if not api_key:
         return None
     h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
-            f"{DIYANET_URL}/api/v1/chapters/{chapter_id}",
+            f"{base_url}/api/v1/chapters/{chapter_id}",
             headers=h,
             params={"language_id": 1, "arabic_text_group_id": 1},
             timeout=15
@@ -701,14 +726,14 @@ def diy_sure_getir(chapter_id: int, api_key: str):
     return None
 
 @st.cache_data(ttl=86400)
-def diy_cuz_getir(juz_id: int, api_key: str):
+def diy_cuz_getir(juz_id: int, api_key: str, base_url: str = DIYANET_URL):
     """GET /api/v1/juz/{juz_id} → [VerseResource] (direkt array)"""
     if not api_key:
         return None
     h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
-            f"{DIYANET_URL}/api/v1/juz/{juz_id}",
+            f"{base_url}/api/v1/juz/{juz_id}",
             headers=h, params={"language_id": 1}, timeout=15
         )
         if r.ok:
@@ -723,14 +748,14 @@ def diy_cuz_getir(juz_id: int, api_key: str):
     return None
 
 @st.cache_data(ttl=86400)
-def diy_sayfa_getir(sayfa: int, api_key: str):
+def diy_sayfa_getir(sayfa: int, api_key: str, base_url: str = DIYANET_URL):
     """GET /api/v1/verses/page/{page_number} → {data: [VerseResource], meta, success}"""
     if not api_key:
         return None
     h = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
     try:
         r = requests.get(
-            f"{DIYANET_URL}/api/v1/verses/page/{sayfa}",
+            f"{base_url}/api/v1/verses/page/{sayfa}",
             headers=h,
             params={"language_id": 1, "arabic_text_group_id": 1},
             timeout=12
@@ -1304,7 +1329,7 @@ with st.sidebar:
 
     # ── DİYANET API ANAHTARI ──
     st.divider()
-    with st.expander("📖 Diyanet Kuran API Anahtarı", expanded=not bool(diyanet_aktif())):
+    with st.expander("📖 DIB_KURAN_API_TOKEN", expanded=not bool(diyanet_aktif())):
         st.markdown('<p style="font-size:0.78em;color:#4a6a8a;">Resmi Diyanet Kuran API icin JWT token. <a href="https://t061.diyanet.gov.tr" target="_blank" style="color:#c8a84b;">Portal -></a></p>', unsafe_allow_html=True)
         _dkey = st.text_input(
             "Diyanet API Key",
@@ -1840,6 +1865,9 @@ with tab3:
     _diy = diyanet_aktif()
     if _diy:
         st.markdown('<div class="uyari-not">🟢 <strong>Diyanet Açık Kaynak Kuran API</strong> aktif — Resmi Türkçe çeviri + Arapça metin kullanılıyor.</div>', unsafe_allow_html=True)
+        # Debug: gerçek API key isimlerini göster (sure listesi yüklendikten sonra görünür)
+        if "diy_sure_ornek" in st.session_state:
+            st.caption(f"📋 Diyanet API sure key'leri: `{st.session_state['diy_sure_ornek']}`")
     else:
         st.markdown('<div class="uyari-not">🟡 Diyanet API anahtarı girilmedi — <strong>alquran.cloud</strong> yedek kaynağı kullanılıyor. Sol panelden Diyanet API anahtarı ekleyebilirsiniz.</div>', unsafe_allow_html=True)
 
@@ -1861,7 +1889,7 @@ with tab3:
         if _diy:
             # Diyanet: rastgele sayfa → ilk ayet
             _rand_sayfa = random.randint(1, 604)
-            _sayfa_ayetler = diy_sayfa_getir(_rand_sayfa, diyanet_key())
+            _sayfa_ayetler = diy_sayfa_getir(_rand_sayfa, diyanet_key(), diyanet_base_url())
             if _sayfa_ayetler and isinstance(_sayfa_ayetler, list) and len(_sayfa_ayetler) > 0:
                 _idx = random.randint(0, min(5, len(_sayfa_ayetler)-1))
                 _a = _sayfa_ayetler[_idx]
@@ -1926,12 +1954,26 @@ with tab3:
         with kuran_sekme[0]:
             # Diyanet sure listesi
             _dkey = diyanet_key()
-            _diy_sureler = diy_sureler(_dkey) if _diy else []
+            _diy_base = diyanet_base_url()
+            _diy_sureler = diy_sureler(_dkey, _diy_base) if _diy else []
             if _diy_sureler:
-                # ChapterResource kesinlikle: id, name_turkish, name_arabic, verse_count, first_page
+                # İlk öğeyi debug için kaydet (gerçek key isimlerini görmek için)
+                if _diy_sureler and "diy_sure_ornek" not in st.session_state:
+                    st.session_state["diy_sure_ornek"] = list(_diy_sureler[0].keys())
+
+                # Olası key isimleri: id/number/surah_id, name_turkish/name_tr/turkish_name, name_arabic/arabic_name
+                def _sure_id(s):
+                    return s.get("id") or s.get("number") or s.get("surah_id") or s.get("chapter_id", 0)
+                def _sure_tr(s):
+                    return s.get("name_turkish") or s.get("name_tr") or s.get("turkish_name") or s.get("name", "?")
+                def _sure_ar(s):
+                    return s.get("name_arabic") or s.get("arabic_name") or s.get("name_ar") or ""
+                def _sure_ayet(s):
+                    return s.get("verse_count") or s.get("ayah_count") or s.get("verses_count") or "?"
+
                 sure_sec_d = {
-                    f"{s['id']:3}. {s['name_turkish']}  ({s['name_arabic']})  — {s.get('verse_count','?')} ayet": s['id']
-                    for s in _diy_sureler
+                    f"{_sure_id(s):3}. {_sure_tr(s)}  {_sure_ar(s)}  — {_sure_ayet(s)} ayet": _sure_id(s)
+                    for s in _diy_sureler if _sure_id(s)
                 }
                 _secili_sure_str = st.selectbox("Sure Seç", list(sure_sec_d.keys()), index=0, key="diy_sure_sb")
                 _secili_sure_no  = sure_sec_d[_secili_sure_str]
@@ -1952,7 +1994,7 @@ with tab3:
             if st.button("📖 Sureyi Yükle", use_container_width=True, key="sure_yukle_btn"):
                 with st.spinner("Sure yükleniyor…"):
                     if _diy:
-                        st.session_state[_sure_key] = diy_sure_getir(_secili_sure_no, diyanet_key())
+                        st.session_state[_sure_key] = diy_sure_getir(_secili_sure_no, diyanet_key(), diyanet_base_url())
                     else:
                         st.session_state[_sure_key] = sureyi_getir(_secili_sure_no)
 
@@ -2030,7 +2072,7 @@ with tab3:
                     ck = f"cuz_d_{cuz_no}"
                     with st.spinner(f"{cuz_no}. Cüz yükleniyor…"):
                         if _diy:
-                            st.session_state[ck] = diy_cuz_getir(cuz_no, diyanet_key())
+                            st.session_state[ck] = diy_cuz_getir(cuz_no, diyanet_key(), diyanet_base_url())
                         else:
                             _fb = cuz_getir(cuz_no)
                             st.session_state[ck] = _fb.get("ayahs", []) if _fb else []
@@ -2072,7 +2114,7 @@ with tab3:
                     if st.button("📄 Getir", use_container_width=True, key="sayfa_getir_btn"):
                         _sk = f"sayfa_{sayfa_no}"
                         with st.spinner(f"{sayfa_no}. Sayfa yükleniyor…"):
-                            st.session_state[_sk] = diy_sayfa_getir(sayfa_no, diyanet_key())
+                            st.session_state[_sk] = diy_sayfa_getir(sayfa_no, diyanet_key(), diyanet_base_url())
 
                 _sayfa_ic = st.session_state.get(f"sayfa_{sayfa_no}")
                 if _sayfa_ic and isinstance(_sayfa_ic, list):
