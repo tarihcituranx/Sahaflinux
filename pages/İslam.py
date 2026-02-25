@@ -190,6 +190,29 @@ def canlı_gs_js(element_id: str, hedef_dt) -> str:
     </script>
     """
 
+def groq_sor(mesajlar: list, sistem: str = None) -> str:
+    try:
+        from groq import Groq
+        client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+        msgs = []
+        if sistem: msgs.append({"role": "system", "content": sistem})
+        msgs.extend(mesajlar)
+        yanit = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=msgs,
+            max_tokens=1200,
+            temperature=0.65,
+        )
+        return yanit.choices[0].message.content
+    except Exception as e:
+        return f"⚠️ Yapay zeka hatası: {str(e)}"
+
+def groq_cevir(metin: str) -> str:
+    return groq_sor(
+        [{"role": "user", "content": f"Sadece Türkçeye çevir, başka hiçbir şey yazma: {metin}"}],
+        sistem="Sen bir çevirmensin. Sadece çeviriyi ver, hiçbir açıklama ekleme.",
+    )
+
 # ─────────────────────────────────────────────────────────────
 # SESSION STATE
 # ─────────────────────────────────────────────────────────────
@@ -202,7 +225,7 @@ defaults = {
     "geo_denendi": False,
     "ayet_tohumu": random.randint(1, 9999),
     "ramazan_dua": None,
-    "api_debug_log": {} # API verilerini debug için tutacağız
+    "api_debug_log": {}
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -322,6 +345,38 @@ def ramazan_kontrol(tarih_str: str):
     try:
         r = requests.get(RAMADAN_URL, params={"date": tarih_str}, timeout=5)
         return r.json() if r.ok else None
+    except: return None
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def sure_listesi_getir():
+    try:
+        r = requests.get(f"{QURAN_URL}/surah", timeout=10)
+        return r.json().get("data", []) if r.ok else []
+    except: return []
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def sureyi_getir(sure_no: int):
+    try:
+        r = requests.get(f"{QURAN_URL}/surah/{sure_no}/tr.diyanet", timeout=15)
+        return r.json().get("data", None) if r.ok else None
+    except: return None
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def ayet_getir(ayet_no: int):
+    try:
+        r1 = requests.get(f"{QURAN_URL}/ayah/{ayet_no}", timeout=8)
+        r2 = requests.get(f"{QURAN_URL}/ayah/{ayet_no}/tr.diyanet", timeout=8)
+        return {
+            "ar": r1.json().get("data", {}) if r1.ok else {},
+            "tr": r2.json().get("data", {}) if r2.ok else {},
+        }
+    except: return None
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def cuz_getir(cuz_no: int):
+    try:
+        r = requests.get(f"{QURAN_URL}/juz/{cuz_no}/tr.diyanet", timeout=15)
+        return r.json().get("data", None) if r.ok else None
     except: return None
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -544,6 +599,9 @@ with st.sidebar:
     with c_btn2:
         if st.button("🎲 Ayet", use_container_width=True):
             st.session_state.ayet_tohumu = random.randint(1, 9999)
+            for k in list(st.session_state.keys()):
+                if k.startswith("tefsir_") or k.startswith("sure_anlam_"):
+                    del st.session_state[k]
             st.rerun()
 
 # ─────────────────────────────────────────────────────────────
@@ -556,7 +614,7 @@ bugun_api  = now_tr.strftime("%d-%m-%Y")
 vakitler_norm = []
 bugun_vakit = yarin_vakit = None
 kaynak_aktif = st.session_state.kaynak
-api_raw_data = None # Debug için ham veriyi tut
+api_raw_data = None 
 
 if kaynak_aktif == "imsakiyem" and st.session_state.ilce_id:
     ham_liste = im_vakitler(st.session_state.ilce_id, "weekly")
@@ -580,7 +638,6 @@ if kaynak_aktif in ["emushaf", "emushaf_fallback"] and st.session_state.ilce_id_
 if vakitler_norm:
     bugun_vakit = next((v for v in vakitler_norm if v.get("tarih_kisa") == bugun_kisa), None)
     if not bugun_vakit and len(vakitler_norm) > 0:
-        # Eğer bugünü bulamadıysa, ilk günü bugün kabul et (bazı API'ler saat dilimi farkı yapabilir)
         bugun_vakit = vakitler_norm[0]
     
     if bugun_vakit:
@@ -618,10 +675,15 @@ st.markdown(f"""
 st.components.v1.html("""<script>(function tick(){var el=window.parent.document.getElementById('tr-saat');if(el)el.textContent=new Date().toLocaleTimeString('tr-TR',{timeZone:'Europe/Istanbul',hour12:false});setTimeout(tick,1000);})();</script>""", height=0)
 
 # ─────────────────────────────────────────────────────────────
-# TABLAR
+# TABLAR (Tam Hali)
 # ─────────────────────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["🕌 Namaz Vakitleri", "🌙 Ramazan", "⚙️ API Debug"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🕌 Namaz Vakitleri", "🌙 Ramazan", "📖 Kuran-ı Kerim", "🤖 Dini Asistan", "⚙️ API Debug"
+])
 
+# ══════════════════════════════════════════════════════════════
+# TAB 1 — NAMAZ VAKİTLERİ
+# ══════════════════════════════════════════════════════════════
 with tab1:
     if not vakitler_norm and not st.session_state.ilce_id and not st.session_state.ilce_id_emushaf:
         st.markdown('<div style="background:#0c1c2e;border:1px dashed #1e3d64;border-radius:18px;padding:50px;text-align:center;margin:20px 0;"><div style="font-size:2.5em;margin-bottom:12px;">📍</div><div style="color:#5a8aaa;font-size:1.1em;">Sol panelden konum seçin.</div></div>', unsafe_allow_html=True)
@@ -650,6 +712,26 @@ with tab1:
             with cols[i]:
                 st.markdown(f'<div class="vakit-card {"aktif" if is_aktif else ""}"><div class="vakit-ikon">{VAKIT_IKONLARI[key]}</div><div class="vakit-adi">{VAKIT_ADLARI[key]}</div><div class="vakit-saat">{bugun_vakit.get(key, "—")}</div>{"<div class=\"vakit-etiket\">● Şu An</div>" if is_aktif else ""}</div>', unsafe_allow_html=True)
 
+        st.markdown('<div class="bolum-baslik">ℹ️ Günün Ek Bilgileri</div>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        kiblesaati = bugun_vakit.get("kiblesaati", "—")
+        gunesdogus = bugun_vakit.get("gunesdogus", "—")
+        gunesbatis = bugun_vakit.get("gunesbatis", "—")
+        gmt        = bugun_vakit.get("gmt", "+3")
+
+        for col, ikon, deger, etiket in [
+            (c1, "🧭", kiblesaati, "Kıble Saati"),
+            (c2, "🌄", gunesdogus, "Güneş Doğumu"),
+            (c3, "🌅", gunesbatis, "Güneş Batımı"),
+            (c4, "🌐", f"GMT+{gmt}" if not str(gmt).startswith("+") else f"GMT{gmt}", "Zaman Dilimi"),
+        ]:
+            with col:
+                deger_goster = deger if deger != "—" else "—"
+                st.markdown(f'<div class="bilgi-kutu"><div style="font-size:1.6em;margin-bottom:6px;">{ikon}</div><div class="bilgi-deger">{deger_goster}</div><div class="bilgi-etiket">{etiket}</div></div>', unsafe_allow_html=True)
+
+        if kiblesaati == "—":
+            st.caption("💡 Kıble saati ve güneş bilgileri yalnızca emushaf.net kaynağında mevcuttur.")
+
         st.markdown('<div class="bolum-baslik">📆 Haftalık Namaz Vakitleri</div>', unsafe_allow_html=True)
         st.markdown('<div class="haftalik-satir baslik"><div>Tarih</div><div style="text-align:center">İmsak</div><div style="text-align:center">Güneş</div><div style="text-align:center">Öğle</div><div style="text-align:center">İkindi</div><div style="text-align:center">Akşam</div><div style="text-align:center">Yatsı</div></div>', unsafe_allow_html=True)
         for v in vakitler_norm[:7]:
@@ -657,12 +739,291 @@ with tab1:
             s_html = "".join([f'<div style="text-align:center;color:{"#c8a84b" if b_mu else "#8aadcc"};">{v.get(k, "—")}</div>' for k in ["imsak", "gunes", "ogle", "ikindi", "aksam", "yatsi"]])
             st.markdown(f'<div class="haftalik-satir {"bugun" if b_mu else ""}"><div style="color:{"#c8a84b" if b_mu else "#5a8aaa"};">{v.get("gun_adi", "")[:3]} {v.get("tarih_kisa", "")} {"◀" if b_mu else ""}</div>{s_html}</div>', unsafe_allow_html=True)
 
-with tab2:
-    st.info("Ramazan modülü (Buraya daha önceki Ramazan kodun gelebilir, sadelik için daralttım)")
+        st.markdown('<div class="uyari-not">ℹ️ Ana kaynak: <strong>imsakiyem.com</strong>. Türkiye dışında zaman dilimi sapmaları oluşabilir — bu Diyanet API\'sinin bilinen bir sınırlamasıdır.</div>', unsafe_allow_html=True)
 
+# ══════════════════════════════════════════════════════════════
+# TAB 2 — RAMAZAN
+# ══════════════════════════════════════════════════════════════
+with tab2:
+    if not ramazan_veri or ramazan_veri.get("status") != "success":
+        st.error("⚠️ Ramazan bilgisi alınamadı.")
+    elif ramazan_mi:
+        rv   = ramazan_veri["data"]
+        hicri = rv.get("hijriDate", {})
+        gun_no = hicri.get("day", {}).get("number", "?")
+
+        st.markdown(f"""
+        <div class="ramazan-pankart">
+            <div class="ramazan-baslik">🌙 Ramazan Mübârek Olsun 🌙</div>
+            <div style="color:#ffd54f;font-size:1.1em;margin-top:12px;">
+                Hicri {hicri.get('year','?')} — {gun_no}. Gün
+            </div>
+            <div style="color:#ffb74d;font-size:0.9em;margin-top:4px;font-family:Amiri,serif;">
+                شَهْرُ رَمَضَانَ الَّذِي أُنزِلَ فِيهِ الْقُرْآنُ
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if bugun_vakit:
+            c1, c2 = st.columns(2)
+            bugun = now_tr.date()
+
+            with c1:
+                iftar_dt = zaman_parse(bugun_vakit.get("aksam", "—"), bugun)
+                if iftar_dt and now_tr < iftar_dt:
+                    iftar_gs = geri_sayim_str(iftar_dt)
+                    st.markdown(f'<div class="geri-sayim ramazan"><div class="gs-ust" style="color:#8a6030;">🍽️ İftara Kalan Süre</div><div class="gs-namaz" style="color:#d8a870;">Akşam Ezanı — {bugun_vakit.get("aksam", "—")}</div><div class="gs-zaman" id="iftar-gs" style="color:#ff9800;">{iftar_gs}</div></div>', unsafe_allow_html=True)
+                    st.components.v1.html(canlı_gs_js("iftar-gs", iftar_dt), height=0)
+                else:
+                    st.markdown('<div class="geri-sayim ramazan" style="padding:32px;"><div class="gs-ust" style="color:#8a6030;">🍽️ İftar</div><div style="font-size:2.5em;margin:8px 0;">✅</div><div style="color:#4caf6a;font-family:Amiri,serif;font-size:1.1em;">Hayırlı İftarlar! 🌙</div></div>', unsafe_allow_html=True)
+
+            with c2:
+                yarin = bugun + timedelta(days=1)
+                if yarin_vakit:
+                    imsak_dt     = zaman_parse(yarin_vakit.get("imsak", "—"), yarin)
+                    imsak_etiket = f"Yarın İmsak — {yarin_vakit.get('imsak', '—')}"
+                else:
+                    imsak_dt     = zaman_parse(bugun_vakit.get("imsak", "—"), bugun)
+                    imsak_etiket = f"Bugün İmsak — {bugun_vakit.get('imsak', '—')}"
+
+                if imsak_dt:
+                    imsak_gs = geri_sayim_str(imsak_dt)
+                    st.markdown(f'<div class="geri-sayim ramazan"><div class="gs-ust" style="color:#8a6030;">🌙 Sahura (İmsak) Kalan Süre</div><div class="gs-namaz" style="color:#d8a870;">{imsak_etiket}</div><div class="gs-zaman" id="imsak-gs" style="color:#ff9800;">{imsak_gs}</div></div>', unsafe_allow_html=True)
+                    st.components.v1.html(canlı_gs_js("imsak-gs", imsak_dt), height=0)
+
+        st.markdown('<div class="bolum-baslik">🤲 Günlük Ramazan Duası</div>', unsafe_allow_html=True)
+        if not st.session_state.ramazan_dua:
+            with st.spinner("Dua hazırlanıyor…"):
+                st.session_state.ramazan_dua = groq_sor(
+                    [{"role": "user", "content": f"Ramazanın {gun_no}. günü için güzel bir iftar duası yaz. Arapça orijinalini, Türkçe okunuşunu ve Türkçe anlamını ver. Kısa ve samimi olsun."}],
+                    sistem="Sen İslami bilgiye hakim, Türkçe konuşan saygılı bir din asistanısın.",
+                )
+        st.markdown(f'<div class="ayet-kutu"><div class="ayet-turkce" style="font-style:normal;">{st.session_state.ramazan_dua}</div></div>', unsafe_allow_html=True)
+        if st.button("🔄 Dua Yenile"):
+            st.session_state.ramazan_dua = None
+            st.rerun()
+
+    else:
+        rv = ramazan_veri["data"]
+        gelecek     = rv.get("nextRamadan", {})
+        tarih_gel   = gelecek.get("date", "?")
+        kalan_en    = gelecek.get("timeLeft", "?")
+
+        tl_key = f"tl_{kalan_en}"
+        if tl_key not in st.session_state and kalan_en != "?":
+            st.session_state[tl_key] = groq_cevir(kalan_en)
+        kalan_tr = st.session_state.get(tl_key, kalan_en)
+
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#0c1c2e,#0f2340);border:1px solid #1e3d64;
+                    border-radius:22px;padding:48px;text-align:center;margin:16px 0;">
+            <div style="font-size:3.5em;margin-bottom:16px;">🌙</div>
+            <div style="font-family:Amiri,serif;font-size:2em;color:#7a9dbd;">Şu An Ramazan Değil</div>
+            <div style="color:#3a6080;margin:10px 0 30px;font-size:0.82em;">
+                Bu bilgi tahmine dayalıdır. Kesin bilgi için yetkili dini kaynaklara başvurun.
+            </div>
+            <div style="background:#0a1420;border:1px solid #1a3050;border-radius:16px;
+                        padding:24px;display:inline-block;min-width:320px;">
+                <div style="color:#3a6080;font-size:0.75em;text-transform:uppercase;letter-spacing:2px;margin-bottom:8px;">
+                    📅 Bir Sonraki Ramazan
+                </div>
+                <div style="font-family:Amiri,serif;font-size:2em;color:#c8a84b;margin:8px 0;">{tarih_gel}</div>
+                <div style="color:#ff9800;font-size:1.1em;">{kalan_tr}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if bugun_vakit:
+            st.markdown(f'<div class="bilgi-kutu" style="margin-top:16px;"><div style="font-family:Amiri,serif;font-size:1.6em;color:#c8a84b;">{bugun_vakit.get("hicri_str","")}</div><div class="bilgi-etiket">Bugünün Hicri Tarihi</div></div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════
+# TAB 3 — KURAN-I KERİM
+# ══════════════════════════════════════════════════════════════
 with tab3:
+    col_sol, col_sag = st.columns([1, 2])
+
+    with col_sol:
+        st.markdown('<div class="bolum-baslik">✨ Günün Ayeti</div>', unsafe_allow_html=True)
+
+        random.seed(st.session_state.ayet_tohumu)
+        rand_ayet_no = random.randint(1, 6236)
+        ayet_veri = ayet_getir(rand_ayet_no)
+
+        if ayet_veri:
+            ar       = ayet_veri.get("ar", {})
+            tr_v     = ayet_veri.get("tr", {})
+            sure_inf = tr_v.get("surah", {})
+            sure_adi_ar  = sure_inf.get("name", "")
+            sure_no_v    = sure_inf.get("number", "")
+            sure_en_adi  = sure_inf.get("englishName", "")
+            sure_en_anlm = sure_inf.get("englishNameTranslation", "")
+            ayet_no_s    = tr_v.get("numberInSurah", "")
+            arapca_metin = ar.get("text", "")
+            turkce_metin = tr_v.get("text", "")
+
+            sk = f"sure_anlam_{sure_no_v}"
+            if sk not in st.session_state and sure_en_anlm:
+                st.session_state[sk] = groq_cevir(f"{sure_en_adi} ({sure_en_anlm})")
+            sure_anlam_tr = st.session_state.get(sk, sure_en_anlm)
+
+            st.markdown(f"""
+            <div class="ayet-kutu">
+                <div class="ayet-arapca">{arapca_metin}</div>
+                <div class="ayet-turkce">"{turkce_metin}"</div>
+                <div class="ayet-kaynak">
+                    📖 {sure_adi_ar} Suresi — {sure_anlam_tr}<br>
+                    {sure_no_v}. Sure, {ayet_no_s}. Ayet
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            tefsir_key = f"tefsir_{sure_no_v}_{ayet_no_s}"
+            if tefsir_key not in st.session_state:
+                with st.spinner("Açıklama hazırlanıyor…"):
+                    st.session_state[tefsir_key] = groq_sor(
+                        [{"role": "user", "content": f"{sure_no_v}. sure ({sure_adi_ar}), {ayet_no_s}. ayet hakkında kısa ve anlaşılır bir açıklama yaz. Türkçe olsun, 3-4 cümle yeterli."}],
+                        sistem="Sen İslami bilgiye hakim, Türkçe konuşan bir din asistanısın. Kısa, sade ve anlaşılır açıklamalar yaparsın.",
+                    )
+            st.markdown('<div class="bolum-baslik">📝 Kısa Açıklama</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="sohbet-kutu">{st.session_state[tefsir_key]}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("Ayet yüklenemedi, menüden 'Ayet' butonuna basarak yenileyin.")
+
+    with col_sag:
+        st.markdown('<div class="bolum-baslik">📚 Sure Okuyucu</div>', unsafe_allow_html=True)
+        sure_listesi = sure_listesi_getir()
+        if sure_listesi:
+            sure_sec = {f"{s['number']:3}. {s['name']}  —  {s.get('englishName','')}" : s["number"] for s in sure_listesi}
+            secili_sure_str = st.selectbox("Sure Seç", list(sure_sec.keys()), index=0)
+            secili_sure_no  = sure_sec[secili_sure_str]
+            sure_key        = f"sure_{secili_sure_no}"
+
+            if st.button("📖 Sureyi Yükle", use_container_width=True):
+                with st.spinner("Sure yükleniyor…"):
+                    st.session_state[sure_key] = sureyi_getir(secili_sure_no)
+
+            sure_icerik = st.session_state.get(sure_key)
+            if sure_icerik:
+                ayetler   = sure_icerik.get("ayahs", [])
+                vahiy     = sure_icerik.get("revelationType", "")
+                vahiy_tr  = "Mekke'de İnen" if vahiy == "Meccan" else "Medine'de İnen" if vahiy == "Medinan" else vahiy
+                s_en_anlm = sure_icerik.get("englishNameTranslation", "")
+                s_ak      = f"sure_anlam_{secili_sure_no}"
+                if s_ak not in st.session_state and s_en_anlm:
+                    st.session_state[s_ak] = groq_cevir(s_en_anlm)
+                s_anlam = st.session_state.get(s_ak, s_en_anlm)
+
+                st.markdown(f'<div style="background:#0c1c2e;border:1px solid #1e3d64;border-radius:14px;padding:16px;text-align:center;margin:10px 0;"><div style="font-family:Amiri,serif;font-size:1.7em;color:#c8a84b;">{sure_icerik.get("name","")}</div><div style="color:#3a6080;font-size:0.85em;margin-top:4px;">{s_anlam} • {sure_icerik.get("numberOfAyahs","?")} Ayet • {vahiy_tr}</div></div>', unsafe_allow_html=True)
+
+                goster = st.slider("Gösterilecek Ayet Sayısı", 5, min(50, len(ayetler)), 10)
+                for ayet in ayetler[:goster]:
+                    st.markdown(f'<div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;padding:14px 18px;margin:5px 0;"><div style="font-size:0.7em;color:#2a5a70;margin-bottom:5px;">{sure_icerik.get("name","")} — {ayet.get("numberInSurah","")}. Ayet</div><div style="color:#a0c0d8;font-size:0.9em;line-height:1.75;">{ayet.get("text","")}</div></div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="bolum-baslik">📋 Cüz Okuyucu</div>', unsafe_allow_html=True)
+        ca, cb = st.columns([2, 1])
+        with ca: cuz_no = st.number_input("Cüz Numarası (1–30)", 1, 30, 30)
+        with cb:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("📋 Getir", use_container_width=True):
+                ck = f"cuz_{cuz_no}"
+                with st.spinner(f"{cuz_no}. Cüz yükleniyor…"):
+                    st.session_state[ck] = cuz_getir(cuz_no)
+
+        cuz_ic = st.session_state.get(f"cuz_{cuz_no}")
+        if cuz_ic:
+            cuz_ayetler = cuz_ic.get("ayahs", [])
+            st.success(f"✅ {cuz_no}. Cüz — {len(cuz_ayetler)} ayet")
+            goster_c = st.slider("Gösterilecek Ayet", 5, min(20, len(cuz_ayetler)), 5, key="cs")
+            for ayet in cuz_ayetler[:goster_c]:
+                sure_ad_c = ayet.get("surah", {}).get("name", "")
+                st.markdown(f'<div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;padding:12px 16px;margin:4px 0;"><div style="font-size:0.7em;color:#2a5a70;">{sure_ad_c} — {ayet.get("numberInSurah","")}. Ayet</div><div style="color:#a0c0d8;font-size:0.88em;line-height:1.7;margin-top:4px;">{ayet.get("text","")}</div></div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════
+# TAB 4 — DİNİ ASİSTAN
+# ══════════════════════════════════════════════════════════════
+with tab4:
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0c1c2e,#0f2340);border:1px solid #1e3d64;
+                border-radius:18px;padding:20px;text-align:center;margin-bottom:16px;">
+        <div style="font-family:Amiri,serif;font-size:1.6em;color:#c8a84b;margin-bottom:6px;">
+            🤖 İslami Dini Asistan
+        </div>
+        <div style="color:#3a6080;font-size:0.82em;">
+            Namaz, ibadet, Kuran, hadis ve dini konular hakkında Türkçe sorabilirsiniz.<br>
+            <span style="color:#2a5070;">Groq AI (Llama 3.3 70B) • Bilgiler tavsiye niteliğindedir</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown('<div class="bolum-baslik">⚡ Hızlı Sorular</div>', unsafe_allow_html=True)
+    h_cols = st.columns(3)
+    hizli_sorular = [
+        ("🌅", "Sabah namazı kaç rekattır?"),
+        ("📖", "Fatiha Suresi'nin anlamı nedir?"),
+        ("🌙", "Ramazanda oruç nasıl tutulur?"),
+        ("🕋", "Hacca kimler gitmeli?"),
+        ("💰", "Zekat hesabı nasıl yapılır?"),
+        ("🤲", "Kunut duası nedir ve nasıl okunur?"),
+    ]
+    SISTEM_PROMPT = """Sen İslami konularda bilgili, saygılı ve Türkçe konuşan bir din asistanısın.
+Tüm yanıtlarını Türkçe yaz. Arapça terimleri kullandığında Türkçe okunuşunu ve anlamını ekle.
+Kısa, net ve anlaşılır cevaplar ver. Yanıtın sonunda 'Kesin dini hükümler için yetkili bir alime başvurun.' ekle."""
+
+    for i, (ikon, soru) in enumerate(hizli_sorular):
+        with h_cols[i % 3]:
+            if st.button(f"{ikon} {soru}", key=f"hs_{i}", use_container_width=True):
+                st.session_state.sohbet.append({"rol": "kullanici", "icerik": soru})
+                with st.spinner("Yanıt hazırlanıyor…"):
+                    yanit = groq_sor(
+                        [{"role": "user" if m["rol"] == "kullanici" else "assistant", "content": m["icerik"]}
+                         for m in st.session_state.sohbet[-8:]],
+                        sistem=SISTEM_PROMPT,
+                    )
+                    st.session_state.sohbet.append({"rol": "asistan", "icerik": yanit})
+                st.rerun()
+
+    if st.session_state.sohbet:
+        st.markdown('<div class="bolum-baslik">💬 Sohbet</div>', unsafe_allow_html=True)
+        for mesaj in st.session_state.sohbet:
+            css = "kullanici" if mesaj["rol"] == "kullanici" else ""
+            rol_adi = "Siz" if mesaj["rol"] == "kullanici" else "🤖 Asistan"
+            st.markdown(f'<div class="sohbet-kutu {css}"><div class="sohbet-rol">{rol_adi}</div>{mesaj["icerik"]}</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+    gi_col, go_col = st.columns([5, 1])
+    with gi_col:
+        kullanici_girisi = st.text_input(
+            "Soru", key="sohbet_gir",
+            placeholder="Örn: Cuma namazı kaç rekattır? / Abdest nasıl alınır?",
+            label_visibility="collapsed",
+        )
+    with go_col:
+        gonder = st.button("📨 Gönder", use_container_width=True)
+
+    if (gonder or kullanici_girisi) and kullanici_girisi.strip():
+        st.session_state.sohbet.append({"rol": "kullanici", "icerik": kullanici_girisi.strip()})
+        with st.spinner("Yanıt hazırlanıyor…"):
+            yanit = groq_sor(
+                [{"role": "user" if m["rol"] == "kullanici" else "assistant", "content": m["icerik"]}
+                 for m in st.session_state.sohbet[-10:]],
+                sistem=SISTEM_PROMPT,
+            )
+            st.session_state.sohbet.append({"rol": "asistan", "icerik": yanit})
+        st.rerun()
+
+    if st.session_state.sohbet:
+        c_t, _ = st.columns([1, 4])
+        with c_t:
+            if st.button("🗑️ Temizle"):
+                st.session_state.sohbet = []
+                st.rerun()
+
+# ══════════════════════════════════════════════════════════════
+# TAB 5 — API DEBUG (Sorun Giderme)
+# ══════════════════════════════════════════════════════════════
+with tab5:
     st.markdown('<div class="bolum-baslik">🛠️ Sorun Giderme ve API Ham Verisi</div>', unsafe_allow_html=True)
-    st.write("Eğer veriler ekranda gözükmüyorsa, arka planda uygulamanın çektiği veriler aşağıdadır. Buradan API'nin saatleri verip vermediğini kontrol edebilirsin.")
+    st.write("Eğer vakitler ekranda gözükmüyorsa, arka planda uygulamanın çektiği veriler aşağıdadır. Buradan API'nin çalışıp çalışmadığını kontrol edebilirsin.")
     if api_raw_data:
         st.json(api_raw_data)
     else:
