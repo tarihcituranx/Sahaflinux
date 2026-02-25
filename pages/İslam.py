@@ -410,29 +410,8 @@ geo_lat  = params.get("lat",     None)
 geo_lng  = params.get("lng",     None)
 geo_red  = params.get("geo_red", None)
 
-# Geolocation arka planda çalışır — uygulamayı BLOKE ETMEZ
-# st.stop() kaldırıldı: iframe sandbox yüzünden redirect bazen çalışmıyordu
-if not geo_lat and not geo_red and not st.session_state.geo_denendi:
-    st.components.v1.html("""
-    <script>
-    (function() {
-        try {
-            if (!navigator.geolocation) return;
-            navigator.geolocation.getCurrentPosition(
-                function(pos) {
-                    var url = new URL(window.parent.location.href);
-                    url.searchParams.set('lat', pos.coords.latitude.toFixed(5));
-                    url.searchParams.set('lng', pos.coords.longitude.toFixed(5));
-                    window.parent.location.replace(url.toString());
-                },
-                function() { /* izin reddedildi, sessizce geç */ },
-                { timeout: 6000, maximumAge: 300000 }
-            );
-        } catch(e) {}
-    })();
-    </script>
-    """, height=0)
-
+# Geolocation Streamlit Cloud sandbox'ta çalışmıyor — tamamen kaldırıldı
+# Konum seçimi ana panel expander'ından yapılıyor (varsayılan: Samsun/Atakum)
 st.session_state.geo_denendi = True
 
 # ─────────────────────────────────────────────────────────────
@@ -614,6 +593,20 @@ def ters_geocode(lat: float, lng: float):
         return r.json() if r.ok else None
     except:
         return None
+@st.cache_data(ttl=86400)
+def kible_acisi_hesapla(lat: float, lng: float) -> float:
+    """Kabe koordinatlarına göre kıble açısını hesapla (derece, kuzeyden saat yönünde)"""
+    import math
+    kabe_lat = math.radians(21.4225)
+    kabe_lng = math.radians(39.8262)
+    lat_r    = math.radians(lat)
+    dlng     = kabe_lng - math.radians(lng)
+    x = math.sin(dlng) * math.cos(kabe_lat)
+    y = math.cos(lat_r) * math.sin(kabe_lat) - math.sin(lat_r) * math.cos(kabe_lat) * math.cos(dlng)
+    aci = math.degrees(math.atan2(x, y))
+    return (aci + 360) % 360
+
+
 
 def groq_api_key_al() -> str:
     """API anahtarını sırayla: secrets → session_state → boş döndür"""
@@ -1368,30 +1361,72 @@ with tab1:
 
         # Ek bilgiler
         st.markdown('<div class="bolum-baslik">ℹ️ Günün Ek Bilgileri</div>', unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4)
-        kiblesaati = bugun_vakit.get("kiblesaati", "—")
+
+        # Kıble açısını konum koordinatlarından hesapla
+        _kible_aci = None
+        _kible_lat = None
+        _kible_lng = None
+        if geo_lat and geo_lng:
+            try:
+                _kible_lat, _kible_lng = float(geo_lat), float(geo_lng)
+            except Exception:
+                pass
+        # geo yoksa Samsun/Atakum koordinatları (varsayılan)
+        if _kible_lat is None:
+            _kible_lat, _kible_lng = 41.3240, 36.2527
+        _kible_aci = kible_acisi_hesapla(_kible_lat, _kible_lng)
+
         gunesdogus = bugun_vakit.get("gunesdogus", "—")
         gunesbatis = bugun_vakit.get("gunesbatis", "—")
         gmt        = bugun_vakit.get("gmt", "+3")
 
+        # Güneş vakitleri emushaf'tan geliyor, imsakiyem için güneş/imsak saatlerini kullan
+        if gunesdogus == "—":
+            gunesdogus = bugun_vakit.get("gunes", "—")
+        if gunesbatis == "—":
+            gunesbatis = bugun_vakit.get("aksam", "—")
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        # Kıble pusulası (SVG)
+        kible_svg = f"""
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+            <svg width="72" height="72" viewBox="0 0 72 72">
+                <circle cx="36" cy="36" r="33" fill="#0c1c2e" stroke="#1e3d64" stroke-width="2"/>
+                <circle cx="36" cy="36" r="2" fill="#c8a84b"/>
+                <!-- Kuzey etiketi -->
+                <text x="36" y="10" text-anchor="middle" fill="#4a7a9b" font-size="8" font-family="Tajawal">K</text>
+                <!-- Kıble oku -->
+                <g transform="rotate({_kible_aci:.1f}, 36, 36)">
+                    <polygon points="36,6 33,36 36,42 39,36" fill="#c8a84b"/>
+                    <polygon points="36,66 33,36 36,30 39,36" fill="#2a4a6a"/>
+                </g>
+            </svg>
+            <div style="font-size:0.75em;color:#c8a84b;margin-top:2px;">{_kible_aci:.1f}°</div>
+        </div>
+        """
+
+        with c1:
+            st.markdown(f"""
+            <div class="bilgi-kutu" style="height:130px;">
+                {kible_svg}
+                <div class="bilgi-etiket" style="margin-top:4px;">Kıble Yönü</div>
+            </div>
+            """, unsafe_allow_html=True)
+
         for col, ikon, deger, etiket in [
-            (c1, "🧭", kiblesaati, "Kıble Saati"),
             (c2, "🌄", gunesdogus, "Güneş Doğumu"),
             (c3, "🌅", gunesbatis, "Güneş Batımı"),
             (c4, "🌐", f"GMT+{gmt}" if not str(gmt).startswith("+") else f"GMT{gmt}", "Zaman Dilimi"),
         ]:
             with col:
-                deger_goster = deger if deger != "—" else "—"
                 st.markdown(f"""
                 <div class="bilgi-kutu">
                     <div style="font-size:1.6em;margin-bottom:6px;">{ikon}</div>
-                    <div class="bilgi-deger">{deger_goster}</div>
+                    <div class="bilgi-deger">{deger}</div>
                     <div class="bilgi-etiket">{etiket}</div>
                 </div>
                 """, unsafe_allow_html=True)
-
-        if kiblesaati == "—":
-            st.caption("💡 Kıble saati ve güneş bilgileri yalnızca emushaf.net kaynağında mevcuttur.")
 
         # Haftalık tablo
         st.markdown('<div class="bolum-baslik">📆 Haftalık Namaz Vakitleri</div>', unsafe_allow_html=True)
