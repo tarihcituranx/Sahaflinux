@@ -402,6 +402,16 @@ for k, v in defaults.items():
         st.session_state[k] = v
 
 # ─────────────────────────────────────────────────────────────
+# İLK AÇILIŞTA VARSAYILAN KONUM: SAMSUN / ATAKUM
+# ─────────────────────────────────────────────────────────────
+if not st.session_state.konum_adi and not st.session_state.ilce_id:
+    _def_id, _def_adi = varsayilan_konum_yukle()
+    if _def_id:
+        st.session_state.ilce_id   = _def_id
+        st.session_state.konum_adi = _def_adi
+        st.session_state.kaynak    = "imsakiyem"
+
+# ─────────────────────────────────────────────────────────────
 # GEOLOCATION → QUERY PARAMS
 # ─────────────────────────────────────────────────────────────
 params   = st.query_params
@@ -486,6 +496,27 @@ def im_vakitler(district_id: str, period: str = "weekly"):
         return []
     except Exception:
         return []
+
+@st.cache_data(ttl=86400)
+def varsayilan_konum_yukle():
+    """Samsun / Atakum ilçesini imsakiyem'den bul, _id döndür"""
+    try:
+        sonuclar = im_ara("districts", "Atakum")
+        for s in sonuclar:
+            if "atakum" in s.get("name", "").lower():
+                sehir = ""
+                if isinstance(s.get("state_id"), dict):
+                    sehir = s["state_id"].get("name", "")
+                return s["_id"], f"📍 {sehir} / {s['name']}" if sehir else f"📍 {s['name']}"
+        # Bulamazsa Samsun merkez dene
+        sonuclar2 = im_ara("districts", "Samsun")
+        if sonuclar2:
+            s = sonuclar2[0]
+            sehir = s["state_id"].get("name", "") if isinstance(s.get("state_id"), dict) else ""
+            return s["_id"], f"📍 {sehir} / {s['name']}" if sehir else f"📍 {s['name']}"
+    except Exception:
+        pass
+    return None, None
 
 # ─────────────────────────────────────────────────────────────
 # ═══════════════  EMUSHAF YEDEK API  ═══════════════
@@ -1221,17 +1252,84 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # TAB 1 — NAMAZ VAKİTLERİ
 # ══════════════════════════════════════════════════════════════
 with tab1:
-    if not vakitler_norm and not st.session_state.ilce_id and not st.session_state.ilce_id_emushaf:
-        st.markdown("""
-        <div style="background:#0c1c2e;border:1px dashed #1e3d64;border-radius:18px;
-                    padding:50px;text-align:center;margin:20px 0;">
-            <div style="font-size:2.5em;margin-bottom:12px;">📍</div>
-            <div style="color:#5a8aaa;font-size:1.1em;">Sol panelden konum seçin ya da konum iznine izin verin.</div>
-        </div>
-        """, unsafe_allow_html=True)
 
-    elif not bugun_vakit:
-        st.error("⚠️ Namaz vakitleri alınamadı. Lütfen yenileyin.")
+    # ── ANA PANEL KONUm DEĞİŞTİRME ──
+    with st.expander("📍 Konum Seç / Değiştir", expanded=not bool(st.session_state.konum_adi)):
+        st.markdown('<p style="font-size:0.82em;color:#5a8aaa;margin-bottom:6px;">Şehir veya ilçe adını yazarak arayın:</p>', unsafe_allow_html=True)
+        ara_col, btn_col = st.columns([3, 1])
+        with ara_col:
+            konum_ara = st.text_input("İlçe Ara", placeholder="Örn: Atakum, Kadıköy, Konya…",
+                                       key="tab1_ara", label_visibility="collapsed")
+        with btn_col:
+            ara_btn = st.button("🔍 Ara", key="tab1_ara_btn", use_container_width=True)
+
+        if konum_ara.strip() and (ara_btn or len(konum_ara) > 2):
+            sonuclar_ara = im_ara("districts", konum_ara.strip())
+            if sonuclar_ara:
+                s_display_ara = [
+                    f"{r.get('name','')}  —  {r.get('state_id',{}).get('name','') if isinstance(r.get('state_id'),dict) else ''}"
+                    for r in sonuclar_ara[:12]
+                ]
+                secim_ara = st.selectbox("Sonuç Seç", s_display_ara, key="tab1_secim", label_visibility="collapsed")
+                if st.button("✅ Bu Konumu Kullan", key="tab1_uygula", use_container_width=True):
+                    idx_ara = s_display_ara.index(secim_ara)
+                    sec = sonuclar_ara[idx_ara]
+                    st.session_state.ilce_id   = sec["_id"]
+                    st.session_state.konum_adi = f"📍 {secim_ara.replace('  —  ', ' / ')}"
+                    st.session_state.kaynak    = "imsakiyem"
+                    im_vakitler.clear()
+                    st.rerun()
+            else:
+                st.caption("⚠️ Sonuç bulunamadı, başka bir isim deneyin.")
+
+        st.markdown('<hr style="border-color:#1a3050;margin:10px 0">', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:0.78em;color:#3a5a70;">Ya da listeden seçin:</p>', unsafe_allow_html=True)
+        ulkeler_exp = im_ulkeler()
+        if ulkeler_exp:
+            ulke_disp_exp = [u.get("name","") for u in ulkeler_exp]
+            try:
+                v_ulke_exp = next(i for i, u in enumerate(ulkeler_exp)
+                                   if "Türkiye" in u.get("name","") or "Turkey" in u.get("name_en",""))
+            except Exception:
+                v_ulke_exp = 0
+            ec1, ec2, ec3 = st.columns(3)
+            with ec1:
+                s_ulke_exp = st.selectbox("Ülke", ulke_disp_exp, index=v_ulke_exp,
+                                           key="exp_ulke", label_visibility="visible")
+                sec_ulke_exp = next((u for u in ulkeler_exp if u.get("name")==s_ulke_exp), None)
+            with ec2:
+                eyaletler_exp = im_eyaletler(sec_ulke_exp["_id"]) if sec_ulke_exp else []
+                eyalet_disp_exp = [e.get("name","") for e in eyaletler_exp]
+                try:
+                    v_eyalet_exp = next(i for i, e in enumerate(eyaletler_exp)
+                                         if "Samsun" in e.get("name",""))
+                except Exception:
+                    v_eyalet_exp = 0
+                s_eyalet_exp = st.selectbox("Şehir", eyalet_disp_exp, index=v_eyalet_exp,
+                                             key="exp_eyalet", label_visibility="visible")
+                sec_eyalet_exp = next((e for e in eyaletler_exp if e.get("name")==s_eyalet_exp), None)
+            with ec3:
+                ilceler_exp = im_ilceler(sec_eyalet_exp["_id"]) if sec_eyalet_exp else []
+                ilce_disp_exp = [i.get("name","") for i in ilceler_exp]
+                try:
+                    v_ilce_exp = next(i for i, x in enumerate(ilceler_exp)
+                                       if "Atakum" in x.get("name",""))
+                except Exception:
+                    v_ilce_exp = 0
+                s_ilce_exp = st.selectbox("İlçe", ilce_disp_exp, index=v_ilce_exp,
+                                           key="exp_ilce", label_visibility="visible")
+                sec_ilce_exp = next((i for i in ilceler_exp if i.get("name")==s_ilce_exp), None)
+
+            if st.button("✅ Seçilen Konumu Uygula", key="exp_uygula", use_container_width=True):
+                if sec_ilce_exp:
+                    st.session_state.ilce_id   = sec_ilce_exp["_id"]
+                    st.session_state.konum_adi = f"📍 {s_eyalet_exp} / {s_ilce_exp}"
+                    st.session_state.kaynak    = "imsakiyem"
+                    im_vakitler.clear()
+                    st.rerun()
+
+    if not bugun_vakit:
+        st.warning("⏳ Vakitler yükleniyor ya da konum bulunamadı. Lütfen yukarıdan konum seçin.")
 
     else:
         # Geri sayım
