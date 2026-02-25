@@ -1616,8 +1616,37 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
 
+        # Ezan otomatik oynatma
+        _EZAN_DOSYA = {
+            "imsak":    "t/ezan_sabah.mp3",
+            "sabah":    "t/ezan_sabah.mp3",
+            "gunes":    None,
+            "ogle":     "t/ezan_ogle.mp3",
+            "ikindi":   "t/ezan_ikindi.mp3",
+            "aksam":    "t/ezan_aksam.mp3",
+            "yatsi":    "t/ezan_yatsi.mp3",
+        }
+        _aktif_ezan_dosya = _EZAN_DOSYA.get(aktif_key)
+        if _aktif_ezan_dosya and os.path.exists(_aktif_ezan_dosya):
+            _vakit_adi_goster = VAKIT_ADLARI.get(aktif_key, aktif_key)
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#0c1c2e,#0a1828);border:1px solid #1e3d64;
+                        border-radius:14px;padding:18px 22px;margin:18px 0;display:flex;align-items:center;gap:16px;">
+                <div style="font-size:2.2em;">{VAKIT_IKONLARI.get(aktif_key,'🕌')}</div>
+                <div>
+                    <div style="color:#c8a84b;font-weight:bold;font-size:0.95em;">
+                        🔔 {_vakit_adi_goster} Ezanı
+                    </div>
+                    <div style="color:#3a6080;font-size:0.8em;margin-top:2px;">Şu anki vakit ezanı</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            with open(_aktif_ezan_dosya, "rb") as _ez_f:
+                st.audio(_ez_f.read(), format="audio/mp3")
+
         # Ek bilgiler
         st.markdown('<div class="bolum-baslik">ℹ️ Günün Ek Bilgileri</div>', unsafe_allow_html=True)
+
 
         # Kıble açısını konum koordinatlarından hesapla
         _kible_aci = None
@@ -1785,6 +1814,12 @@ with tab2:
                         <div style="color:#4caf6a;font-family:Amiri,serif;font-size:1.1em;">Hayırlı İftarlar! 🌙</div>
                     </div>
                     """, unsafe_allow_html=True)
+                    # İftar oldu → Akşam Ezanı Oyna
+                    if os.path.exists("t/ezan_aksam.mp3"):
+                        st.markdown('<div style="color:#c8a84b;font-size:0.9em;font-weight:bold;margin-top:8px;">🔔 Akşam Ezanı</div>', unsafe_allow_html=True)
+                        with open("t/ezan_aksam.mp3", "rb") as _ef:
+                            st.audio(_ef.read(), format="audio/mp3")
+
 
             # İMSAK / SAHUR
             with c2:
@@ -2187,8 +2222,12 @@ with tab3:
             cuz_ic = st.session_state.get(f"cuz_d_{cuz_no}")
             if cuz_ic:
                 _cuz_ayetler = cuz_ic if isinstance(cuz_ic, list) else cuz_ic.get("ayahs", [])
-                st.success(f"✅ {cuz_no}. Cüz — {len(_cuz_ayetler)} ayet")
-                _goster_c = st.slider("Gösterilecek Ayet", 5, min(20, len(_cuz_ayetler)), 5, key="cuz_sl")
+                if not _cuz_ayetler:
+                    st.warning("Bu cüz için ayet yüklenemedi. Tekrar deneyin.")
+                else:
+                    st.success(f"✅ {cuz_no}. Cüz — {len(_cuz_ayetler)} ayet")
+                    _max_c = max(1, min(20, len(_cuz_ayetler)))
+                    _goster_c = st.slider("Gösterilecek Ayet", 1, _max_c, min(5, _max_c), key="cuz_sl")
                 for _cav in _cuz_ayetler[:_goster_c]:
                     # Diyanet & alquran.cloud uyumlu alan isimleri
                     _s_info = _cav.get("surah_info", {})
@@ -2423,14 +2462,27 @@ with tab5:
                     if i + j < len(current_books):
                         bk = current_books[i + j]
                         with cols[j]:
+                            photo_url = bk.get("photo", "")
+                            pdf_url   = bk.get("path", "#")
+                            book_name = bk.get("name", "")
+                            # Fotoğraf bozuksa gri arka plan + kitap ikonu göster
+                            img_html = f'''
+                                <div style="height:220px;overflow:hidden;border-radius:6px;margin-bottom:10px;background:#080e1a;display:flex;align-items:center;justify-content:center;">
+                                    <img src="{photo_url}" style="width:100%;height:100%;object-fit:cover;"
+                                        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+                                    >
+                                    <div style="display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;color:#3a6080;">
+                                        <div style="font-size:3em;">&#128218;</div>
+                                        <div style="font-size:0.75em;text-align:center;padding:8px;">{book_name[:30]}</div>
+                                    </div>
+                                </div>
+                            '''
                             st.markdown(
                                 f'''
                                 <div style="background:#0c1c2e; padding:10px; border-radius:10px; text-align:center; height:100%; border:1px solid #1a3050; margin-bottom:15px;">
-                                    <div style="height:250px; overflow:hidden; border-radius:6px; margin-bottom:10px; background:#080e1a; display:flex; align-items:center;">
-                                        <img src="{bk.get("photo", "")}" style="width:100%;" onerror="this.src='https://diniyayinlar.diyanet.gov.tr/Content/img/logo.png'">
-                                    </div>
-                                    <div style="font-size:0.85em; font-weight:bold; color:#a0c0d8; min-height:45px; display:flex; align-items:center; justify-content:center;">{bk.get("name", "")}</div>
-                                    <a href="{bk.get("path", "#")}" target="_blank" style="display:inline-block; margin-top:10px; background:#c8a84b; color:#080e1a; padding:6px 16px; border-radius:6px; text-decoration:none; font-size:0.85em; font-weight:bold;">📖 PDF İndir/Oku</a>
+                                    {img_html}
+                                    <div style="font-size:0.85em; font-weight:bold; color:#a0c0d8; min-height:45px; display:flex; align-items:center; justify-content:center;">{book_name}</div>
+                                    <a href="{pdf_url}" target="_blank" style="display:inline-block; margin-top:10px; background:#c8a84b; color:#080e1a; padding:6px 16px; border-radius:6px; text-decoration:none; font-size:0.85em; font-weight:bold;">📖 PDF İndir/Oku</a>
                                 </div>
                                 ''', unsafe_allow_html=True
                             )
@@ -2533,8 +2585,24 @@ with tab5:
 
     # ── ABDEST ──
     with lib_tabs[3]:
-        st.markdown('<p style="color:#a0c0d8;">Aşağıdaki görselleri takip ederek Hanefi mezhebine göre abdest alma adımlarını öğrenebilirsiniz.</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#a0c0d8;">Hanefi mezhebine göre abdest alma adımları. Görseller ve açıklamalar birlikte verilmiştir.</p>', unsafe_allow_html=True)
         abdest_klasor = "t/abdest"
+        
+        ABDEST_ACIKLAMALAR = [
+            ("Niyet ve Başlama", "Abdeste niyet edilir. ‘Niyet ettim Allah rızası için abdest almaya’ diye kalben niyet edilir ve Besmele ile başlanir."),
+            ("Ellerin Yıkanması", "Her iki el bileklerine kadar üç kez yıkanır. Parmak araları ovulur."),
+            ("Ağzın Yıkanması", "Sağ eliyle üç kez ağza su alınarak iyice çalkalanip boşaltılır."),
+            ("Burnun Yıkanması", "Sağ elle üç kez burna su çekilir, sol el ile sıkılarak temizlenir."),
+            ("Yüzün Yıkanması", "Alının başlatıldığı yerden çenin altına, bir kulak memesinden öbeküne kadar tüm yüz üç kez yıkanır."),
+            ("Sağ Kolun Yıkanması", "Sağ el parmak uçlarından dirsek dahil üç kez yıkanır."),
+            ("İki Kolun Yıkanması", "Sol el parmak uçlarından dirsek dahil üç kez yıkanır."),
+            ("Başın Meşhedilmesi", "Islak eller başın önünden arkağa ve arkaᗽan öne sekerek başın dörtte biri bir kez mesh edilir."),
+            ("Kulakların Meşhedilmesi", "Islak elin şeharet parmakları ile kulak içleri, baş parmaklar ile kulak arkaları bir kez mesh edilir."),
+            ("Boyun / Ensenin Meşhedilmesi", "Ellerin sırtıyla boyun bir kez mesh edilir."),
+            ("Sağ Ayağın Yıkanması", "Sağ ayak, parmak uçlarından topuk dahil üç kez yıkanır. Parmak araları sol elin küçük parmağıyla ovulur."),
+            ("Sol Ayağın Yıkanması", "Sol ayak parmak uçlarından topuk dahil üç kez yıkanır. Abdest tamamlanır; dua okunur: ‘Eşhedu enlâ ilâhe illallâh...'"),
+        ]
+        
         if os.path.exists(abdest_klasor):
             img_list = []
             for i in range(1, 13):
@@ -2542,11 +2610,26 @@ with tab5:
                 if os.path.exists(p):
                     img_list.append(p)
             
-            for i in range(0, len(img_list), 3):
-                cols = st.columns(3)
-                for j in range(3):
+            for i in range(0, len(img_list), 2):
+                cols = st.columns(2)
+                for j in range(2):
                     if i + j < len(img_list):
+                        adim_no = i + j  # 0-indexed
+                        aciklama = ABDEST_ACIKLAMALAR[adim_no] if adim_no < len(ABDEST_ACIKLAMALAR) else (f"Adım {adim_no+1}", "")
                         with cols[j]:
-                            st.markdown(f'<div style="text-align:center; color:#c8a84b; font-weight:bold; margin-bottom:5px;">Adım {i+j+1}</div>', unsafe_allow_html=True)
+                            st.markdown(f'''
+                            <div style="background:#0c1c2e;border:1px solid #1e3d64;border-radius:12px;overflow:hidden;margin-bottom:18px;">
+                                <div style="background:#0a1828;padding:10px 14px;border-bottom:1px solid #1e3d64;">
+                                    <span style="color:#c8a84b;font-weight:bold;font-size:0.95em;">Adım {adim_no+1}</span>
+                                    <span style="color:#ddd0b8;font-weight:bold;margin-left:8px;">{aciklama[0]}</span>
+                                </div>
+                            </div>
+                            ''', unsafe_allow_html=True)
                             st.image(img_list[i+j], use_container_width=True)
-                            st.markdown("<br>", unsafe_allow_html=True)
+                            st.markdown(f'''
+                            <div style="background:#080e1a;border:1px solid #1a3050;border-radius:0 0 10px 10px;
+                                        padding:12px 14px;margin-top:-5px;margin-bottom:18px;font-size:0.88em;
+                                        color:#a0c0d8;line-height:1.7;">
+                                {aciklama[1]}
+                            </div>
+                            ''', unsafe_allow_html=True)
