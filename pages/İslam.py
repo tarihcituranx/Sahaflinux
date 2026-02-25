@@ -612,6 +612,17 @@ def ayet_getir(ayet_no: int):
     except:
         return None
 
+@st.cache_data(ttl=3600)
+def fetch_audio_bytes(url: str) -> bytes:
+    """Ses dosyasını sunucu tarafında çeker (CORS bypas). 1 saatlik cache."""
+    try:
+        r = requests.get(url, timeout=12, headers={"User-Agent": "Mozilla/5.0"})
+        if r.ok and len(r.content) > 1000:
+            return r.content
+    except Exception:
+        pass
+    return b""
+
 @st.cache_data(ttl=86400)
 def cuz_getir(cuz_no: int):
     try:
@@ -619,6 +630,7 @@ def cuz_getir(cuz_no: int):
         return r.json().get("data", None) if r.ok else None
     except:
         return None
+
 
 # Sure → Cüz sabit haritası (API juz_number döndürmediğinde fallback)
 _SURE_CUZ_MAP = {
@@ -2247,14 +2259,15 @@ with tab3:
                             with _qe_col:
                                 st.caption("🎙️ Mişari Raşid el-Afasi (QuranExplorer)")
                                 if _audio_qe:
-                                    st.markdown(
-                                        f'<audio controls style="width:100%;margin-top:4px;">'
-                                        f'<source src="{_audio_qe}" type="audio/mpeg">'
-                                        f'</audio>'
-                                        f'<div style="font-size:0.7em;color:#5a8aaa;margin-top:2px;">'
-                                        f'<a href="{_audio_qe}" target="_blank" style="color:#c8a84b;">⬇ İndir/Aç</a></div>',
-                                        unsafe_allow_html=True
-                                    )
+                                    _qe_bytes = fetch_audio_bytes(_audio_qe)
+                                    if _qe_bytes:
+                                        st.audio(_qe_bytes, format="audio/mp3")
+                                    else:
+                                        st.markdown(
+                                            f'<a href="{_audio_qe}" target="_blank" '
+                                            f'style="color:#c8a84b;font-size:0.85em;">⬇ QuranExplorer\'da Aç/İndir</a>',
+                                            unsafe_allow_html=True
+                                        )
                             with _ea_col:
                                 if _audio:
                                     st.caption(f"🔊 {kari_klasor.replace('_128kbps','').replace('_',' ')} (EveryAyah)")
