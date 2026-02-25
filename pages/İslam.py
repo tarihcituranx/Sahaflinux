@@ -1938,8 +1938,8 @@ with tab3:
             if _tefsir_key not in st.session_state and groq_api_key_al():
                 with st.spinner("Açıklama hazırlanıyor…"):
                     st.session_state[_tefsir_key] = groq_sor(
-                        [{"role": "user", "content": f"{_sure_no}. sure ({_sure_adi_ar}), {_ayet_no}. ayet hakkında kısa ve anlaşılır bir açıklama yaz. 3-4 cümle."}],
-                        sistem="Sen İslami bilgiye hakim, Türkçe konuşan bir din asistanısın.",
+                        [{"role": "user", "content": f"{_sure_no}. sure ({_sure_adi_ar} - {_sure_adi_tr}), {_ayet_no}. ayeti hakkında kısa ve anlaşılır bir tefekkür yaz.\n\nKURALLAR:\n1. KUSURSUZ VE AKICI TÜRKÇE KULLAN. Başka hiçbir dilden kelime (tentang vb.) kullanma!\n2. Cümleleri dilbilgisi kurallarına tam uygun, edebi ve hatasız kur.\n3. Yazının sonuna bilgi kaynağı olarak mutlaka şu linki Markdown formatında ekle: [Diyanet Kur'an Portalı (Tefsir)](https://kuran.diyanet.gov.tr)\n4. Toplam 3-4 cümleyi geçme."}],
+                        sistem="Sen İslami bilgiye hakim, Diyanet kaynaklarını esas alan, sadece kusursuz Türkçe konuşan bir din asistanısın.",
                     )
             if _tefsir_key in st.session_state:
                 st.markdown('<div class="bolum-baslik">📝 Açıklama</div>', unsafe_allow_html=True)
@@ -2095,14 +2095,74 @@ with tab3:
                         <div style="color:#3a6080;font-size:0.85em;margin-top:4px;">{_sure_icerik.get('numberOfAyahs','?') if isinstance(_sure_icerik,dict) else '?'} Ayet • {_vahiy_tr}</div>
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    # ── TDV İSLÂM ANSİKLOPEDİSİ (Yedek API için) ──
+                    if _secili_sure_no:
+                        _trk_slugs = [
+                            'fatiha', 'bakara', 'al-i-imran', 'nisa', 'maide', 'enam', 'araf', 'enfal', 'tevbe', 'yunus',
+                            'hud', 'yusuf', 'rad', 'ibrahim', 'hicr', 'nahl', 'isra', 'kehf', 'meryem', 'taha',
+                            'enbiya', 'hac', 'muminun', 'nur', 'furkan', 'suara', 'neml', 'kasas', 'ankebut', 'rum',
+                            'lokman', 'secde', 'ahzab', 'sebe', 'fatir', 'yasin', 'saffat', 'sad', 'zumer', 'mumin',
+                            'fussilet', 'sura', 'zuhruf', 'duhan', 'casiye', 'ahkaf', 'muhammed', 'fetih', 'hucurat', 'kaf',
+                            'zariyat', 'tur', 'necm', 'kamer', 'rahman', 'vakia', 'hadid', 'mucadele', 'hasr', 'mumtehine',
+                            'saf', 'cuma', 'munafikun', 'tegabun', 'talak', 'tahrim', 'mulk', 'kalem', 'hakka', 'mearic',
+                            'nuh', 'cin', 'muzzemmil', 'muddessir', 'kiyame', 'insan', 'murselat', 'nebe', 'naziat', 'abese',
+                            'tekvir', 'infitar', 'mutaffifin', 'insikak', 'buruc', 'tarik', 'ala', 'gasiye', 'fecr', 'beled',
+                            'sems', 'leyl', 'duha', 'insirah', 'tin', 'alak', 'kadir', 'beyyine', 'zilzal', 'adiyat',
+                            'karia', 'tekasur', 'asr', 'humeze', 'fil', 'kureys', 'maun', 'kevser', 'kafirun', 'nasr',
+                            'tebbet', 'ihlas', 'felak', 'nas'
+                        ]
+                        if 1 <= _secili_sure_no <= 114:
+                            _slug = _trk_slugs[_secili_sure_no - 1]
+                            with st.expander(f"📚 TDV İslâm Ansiklopedisi: {_slug.replace('-', ' ').title()} Suresi"):
+                                try:
+                                    import requests
+                                    from bs4 import BeautifulSoup
+                                    
+                                    tdv_url = f"https://islamansiklopedisi.org.tr/{_slug}-suresi"
+                                    r_tdv = requests.get(tdv_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=3)
+                                    if r_tdv.ok:
+                                        soup = BeautifulSoup(r_tdv.text, "html.parser")
+                                        pars = soup.select(".article-body p") or soup.select("p")
+                                        tdv_text = "\n\n".join([p.text.strip() for p in pars if len(p.text.strip()) > 50][:4])
+                                        
+                                        if tdv_text:
+                                            st.markdown(f"<div style='font-size:0.9em;color:#a0c0d8;line-height:1.6;'>{tdv_text}...<br><br><a href='{tdv_url}' target='_blank' style='color:#c8a84b;'>Devamını TDV'de Oku ↗</a></div>", unsafe_allow_html=True)
+                                        else:
+                                            st.warning("TDV Ansiklopedisinde bu sureye ait metin bulunamadı.")
+                                    else:
+                                        st.error("TDV Ansiklopedisi'ne ulaşılamadı.")
+                                except Exception as e:
+                                    st.error(f"TDV bağlantısı sırasında bir hata oluştu: {e}")
+
                     _goster = st.slider("Gösterilecek Ayet Sayısı", 1, len(_ayetler), len(_ayetler), key="fb_sure_sl")
+                    
+                    # Surenin Hangi Cüzde Başladığına Dair Temel Harita
+                    SURE_CUZ_MAP = {
+                        1: 1, 2: 1, 3: 3, 4: 4, 5: 6, 6: 7, 7: 8, 8: 9, 9: 10, 10: 11,
+                        11: 12, 12: 12, 13: 13, 14: 13, 15: 14, 16: 14, 17: 15, 18: 15, 19: 16, 20: 16,
+                        21: 17, 22: 17, 23: 18, 24: 18, 25: 18, 26: 19, 27: 19, 28: 20, 29: 20, 30: 21,
+                        31: 21, 32: 21, 33: 21, 34: 22, 35: 22, 36: 22, 37: 23, 38: 23, 39: 23, 40: 24,
+                        41: 24, 42: 25, 43: 25, 44: 25, 45: 25, 46: 26, 47: 26, 48: 26, 49: 26, 50: 26,
+                        51: 26, 52: 27, 53: 27, 54: 27, 55: 27, 56: 27, 57: 27, 58: 28, 59: 28, 60: 28,
+                        61: 28, 62: 28, 63: 28, 64: 28, 65: 28, 66: 28, 67: 29, 68: 29, 69: 29, 70: 29,
+                        71: 29, 72: 29, 73: 29, 74: 29, 75: 29, 76: 29, 77: 29, 78: 30, 79: 30, 80: 30,
+                        81: 30, 82: 30, 83: 30, 84: 30, 85: 30, 86: 30, 87: 30, 88: 30, 89: 30, 90: 30,
+                        91: 30, 92: 30, 93: 30, 94: 30, 95: 30, 96: 30, 97: 30, 98: 30, 99: 30, 100: 30,
+                        101: 30, 102: 30, 103: 30, 104: 30, 105: 30, 106: 30, 107: 30, 108: 30, 109: 30, 110: 30,
+                        111: 30, 112: 30, 113: 30, 114: 30
+                    }
+                    _juz_fallback = SURE_CUZ_MAP.get(_secili_sure_no, "?")
+                    
                     for _av in _ayetler[:_goster]:
                         _ano = _av.get("numberInSurah", 0)
                         _audio = everyayah_url(_secili_sure_no, _ano, kari_klasor)
                         st.markdown(f"""
                         <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
                                     padding:14px 18px;margin:5px 0;">
-                            <div style="font-size:0.7em;color:#2a5a70;margin-bottom:6px;">{_ano}. Ayet</div>
+                            <div style="font-size:0.7em;color:#2a5a70;margin-bottom:6px;">
+                                {_ano}. Ayet &nbsp;•&nbsp; Cüz {_juz_fallback}
+                            </div>
                             <div style="color:#a0c0d8;font-size:0.9em;line-height:1.75;">{_av.get('text','')}</div>
                         </div>
                         """, unsafe_allow_html=True)
