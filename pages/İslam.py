@@ -1422,29 +1422,40 @@ with tab1:
 
         c1, c2, c3, c4 = st.columns(4)
 
-        # Kıble pusulası (SVG)
-        kible_svg = f"""
-        <svg width="60" height="60" viewBox="0 0 60 60">
-            <circle cx="30" cy="30" r="28" fill="#0a1628" stroke="#1e3d64" stroke-width="1.5"/>
-            <text x="30" y="9" text-anchor="middle" fill="#4a7a9b" font-size="7" font-family="Tajawal,sans-serif">K</text>
-            <text x="30" y="57" text-anchor="middle" fill="#2a4a6a" font-size="7" font-family="Tajawal,sans-serif">G</text>
-            <text x="7"  y="33" text-anchor="middle" fill="#2a4a6a" font-size="7" font-family="Tajawal,sans-serif">B</text>
-            <text x="53" y="33" text-anchor="middle" fill="#2a4a6a" font-size="7" font-family="Tajawal,sans-serif">D</text>
-            <circle cx="30" cy="30" r="2" fill="#c8a84b"/>
-            <g transform="rotate({_kible_aci:.1f}, 30, 30)">
-                <polygon points="30,5 27.5,30 30,36 32.5,30" fill="#c8a84b"/>
-                <polygon points="30,55 27.5,30 30,24 32.5,30" fill="#2a4060"/>
-            </g>
-        </svg>
-        """
-
+        # Kıble pusulası — st.markdown + CSS transform (iframe yok, taşma yok)
         with c1:
+            aci_str = f"{_kible_aci:.1f}"
             st.markdown(f"""
-            <div class="bilgi-kutu">
-                <div style="font-size:1.2em;margin-bottom:2px;">🕋</div>
-                {kible_svg}
-                <div style="font-size:0.75em;color:#c8a84b;line-height:1;">{_kible_aci:.1f}°</div>
-                <div class="bilgi-etiket">Kıble Yönü</div>
+            <div class="bilgi-kutu" style="height:110px;padding:10px 6px;">
+                <div style="position:relative;width:52px;height:52px;flex-shrink:0;">
+                    <div style="position:absolute;inset:0;border-radius:50%;
+                                background:#0a1628;border:1.5px solid #1e3d64;"></div>
+                    <div style="position:absolute;top:1px;left:50%;transform:translateX(-50%);
+                                font-size:8px;color:#4a7a9b;line-height:1;">K</div>
+                    <div style="position:absolute;bottom:1px;left:50%;transform:translateX(-50%);
+                                font-size:8px;color:#2a4a6a;line-height:1;">G</div>
+                    <div style="position:absolute;left:1px;top:50%;transform:translateY(-50%);
+                                font-size:8px;color:#2a4a6a;line-height:1;">B</div>
+                    <div style="position:absolute;right:1px;top:50%;transform:translateY(-50%);
+                                font-size:8px;color:#2a4a6a;line-height:1;">D</div>
+                    <div style="position:absolute;inset:0;display:flex;align-items:center;
+                                justify-content:center;">
+                        <div style="width:4px;height:40px;transform:rotate({aci_str}deg);
+                                    transform-origin:center center;display:flex;
+                                    flex-direction:column;align-items:center;">
+                            <div style="width:0;height:0;
+                                        border-left:4px solid transparent;
+                                        border-right:4px solid transparent;
+                                        border-bottom:20px solid #c8a84b;"></div>
+                            <div style="width:0;height:0;
+                                        border-left:4px solid transparent;
+                                        border-right:4px solid transparent;
+                                        border-top:20px solid #2a4060;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="font-size:0.78em;color:#c8a84b;margin-top:4px;line-height:1;font-weight:700;">{aci_str}°</div>
+                <div class="bilgi-etiket">Kıble</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -1789,9 +1800,17 @@ with tab4:
         ("💰", "Zekat hesabı nasıl yapılır?"),
         ("🤲", "Kunut duası nedir ve nasıl okunur?"),
     ]
-    SISTEM_PROMPT = """Sen İslami konularda bilgili, saygılı ve Türkçe konuşan bir din asistanısın.
-Tüm yanıtlarını Türkçe yaz. Arapça terimleri kullandığında Türkçe okunuşunu ve anlamını ekle.
-Kısa, net ve anlaşılır cevaplar ver. Yanıtın sonunda 'Kesin dini hükümler için yetkili bir alime başvurun.' ekle."""
+    SISTEM_PROMPT = """Sen Türkiye Diyanet İşleri Başkanlığı'nın resmi görüşlerini esas alan, Hanefi mezhebi çerçevesinde Türkçe cevaplar veren bir dini bilgi asistanısın.
+
+KURALLAR:
+- Tüm yanıtlarını yalnızca Türkçe yaz.
+- Sadece Kuran-ı Kerim, Sahih Hadisler ve Diyanet İşleri Başkanlığı'nın resmi fetvalarına dayanan bilgi ver.
+- Diyanet görüşüne aykırı, tartışmalı veya farklı mezhep yorumlarına girme.
+- Arapça terimleri kullanırken parantez içinde Türkçe karşılığını yaz.
+- Cevaplarını kısa ve anlaşılır tut (3-5 cümle yeterli).
+- Siyasi, sosyal veya tartışmalı konularda yorum yapma.
+- Her yanıtının sonuna şunu ekle: "📌 Kesin hüküm için Diyanet İşleri Başkanlığı'na veya yetkili bir din görevlisine başvurun."
+- Dini bilgi dışındaki sorulara (siyaset, kişisel tavsiye, tıp vb.) cevap verme, nazikçe kapsam dışı olduğunu belirt."""
 
     for i, (ikon, soru) in enumerate(hizli_sorular):
         with h_cols[i % 3]:
