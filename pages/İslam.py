@@ -1965,13 +1965,13 @@ with tab3:
 
                 # Olası key isimleri: id/number/surah_id, name_turkish/name_tr/turkish_name, name_arabic/arabic_name
                 def _sure_id(s):
-                    return s.get("id") or s.get("number") or s.get("surah_id") or s.get("chapter_id", 0)
+                    return s.get("SureId") or s.get("id") or s.get("number") or s.get("surah_id") or s.get("chapter_id", 0)
                 def _sure_tr(s):
-                    return s.get("name_turkish") or s.get("name_tr") or s.get("turkish_name") or s.get("name", "?")
+                    return s.get("SureNameTurkish") or s.get("name_turkish") or s.get("name_tr") or s.get("turkish_name") or s.get("name", "?")
                 def _sure_ar(s):
-                    return s.get("name_arabic") or s.get("arabic_name") or s.get("name_ar") or ""
+                    return s.get("SureNameArabic") or s.get("name_arabic") or s.get("arabic_name") or s.get("name_ar") or ""
                 def _sure_ayet(s):
-                    return s.get("verse_count") or s.get("ayah_count") or s.get("verses_count") or "?"
+                    return s.get("AyetCount") or s.get("verse_count") or s.get("ayah_count") or s.get("verses_count") or "?"
 
                 sure_sec_d = {
                     f"{_sure_id(s):>3}. {_sure_tr(s)}  {_sure_ar(s)}  — {_sure_ayet(s)} ayet": _sure_id(s)
@@ -2009,8 +2009,13 @@ with tab3:
                 if _diy and isinstance(_sure_icerik, list):
                     # Diyanet formatı: [VerseResource, ...]
                     # VerseResource: surah_name_turkish, surah_name_arabic, verse_number, surah_number
-                    _sure_adi_goster = _sure_icerik[0].get("surah_name_turkish", "") if _sure_icerik else ""
-                    _sure_adi_ar_g   = _sure_icerik[0].get("surah_name_arabic", "") if _sure_icerik else ""
+                    if _sure_icerik:
+                        _s_info = _sure_icerik[0].get("surah_info", {})
+                        _sure_adi_goster = _s_info.get("name_turkish") or _sure_icerik[0].get("surah_name_turkish", "")
+                        _sure_adi_ar_g   = _sure_icerik[0].get("surah_name_arabic", "")
+                    else:
+                        _sure_adi_goster = ""
+                        _sure_adi_ar_g = ""
                     _vahiy_bilgi = ""
                     st.markdown(f"""
                     <div style="background:#0c1c2e;border:1px solid #1e3d64;border-radius:14px;
@@ -2023,10 +2028,14 @@ with tab3:
                     _goster = st.slider("Gösterilecek Ayet", 5, min(50, len(_sure_icerik)), 10, key="diy_sure_sl")
                     for _av in _sure_icerik[:_goster]:
                         # VerseResource kesin alanlar: surah_number, verse_number, text, arabic_text, juz_number, page_number
-                        _sno   = _av.get("surah_number", _secili_sure_no)
-                        _ano   = _av.get("verse_number", 0)
-                        _metin = _av.get("text", "")
-                        _arapc = _av.get("arabic_text", "")
+                        _sno   = _av.get("surah_id") or _av.get("surah_number", _secili_sure_no)
+                        _ano   = _av.get("verse_id_in_surah") or _av.get("verse_number", 0)
+                        
+                        _t_dict = _av.get("translation")
+                        _metin = _t_dict.get("text", "") if isinstance(_t_dict, dict) else _av.get("text", "")
+                        
+                        _a_dict = _av.get("arabic_script")
+                        _arapc = _a_dict.get("text", "") if isinstance(_a_dict, dict) else _av.get("arabic_text", "")
                         _juz   = _av.get("juz_number", "?")
                         _sayfa = _av.get("page_number", "?")
                         _audio = everyayah_url(_sno, _ano, kari_klasor)
@@ -2090,11 +2099,16 @@ with tab3:
                 _goster_c = st.slider("Gösterilecek Ayet", 5, min(20, len(_cuz_ayetler)), 5, key="cuz_sl")
                 for _cav in _cuz_ayetler[:_goster_c]:
                     # Diyanet & alquran.cloud uyumlu alan isimleri
-                    _c_sure_adi = _cav.get("surah_name_turkish") or _cav.get("surah", {}).get("name", "")
-                    _c_sno = _cav.get("surah_number") or (_cav.get("surah", {}).get("number", 0))
-                    _c_ano = _cav.get("verse_number") or _cav.get("numberInSurah", 0)
-                    _c_arapca = _cav.get("arabic_text", "")
-                    _c_turkce = _cav.get("text", "")
+                    _s_info = _cav.get("surah_info", {})
+                    _c_sure_adi = _s_info.get("name_turkish") or _cav.get("surah_name_turkish") or _cav.get("surah", {}).get("name", "")
+                    _c_sno = _cav.get("surah_id") or _cav.get("surah_number") or (_cav.get("surah", {}).get("number", 0))
+                    _c_ano = _cav.get("verse_id_in_surah") or _cav.get("verse_number") or _cav.get("numberInSurah", 0)
+                    
+                    _c_a_dict = _cav.get("arabic_script")
+                    _c_arapca = _c_a_dict.get("text", "") if isinstance(_c_a_dict, dict) else _cav.get("arabic_text", "")
+                    
+                    _c_t_dict = _cav.get("translation")
+                    _c_turkce = _c_t_dict.get("text", "") if isinstance(_c_t_dict, dict) else _cav.get("text", "")
                     _c_audio  = everyayah_url(_c_sno, _c_ano, kari_klasor)
                     st.markdown(f"""
                     <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
@@ -2126,16 +2140,25 @@ with tab3:
                 if _sayfa_ic and isinstance(_sayfa_ic, list):
                     st.success(f"✅ {sayfa_no}. Sayfa — {len(_sayfa_ic)} ayet")
                     for _sav in _sayfa_ic:
-                        _s_sno = _sav.get("surah_number", 0)
-                        _s_ano = _sav.get("verse_number", 0)
-                        _s_sadi = _sav.get("surah_name_turkish", "")
+                        _s_sno = _sav.get("surah_id") or _sav.get("surah_number", 0)
+                        _s_ano = _sav.get("verse_id_in_surah") or _sav.get("verse_number", 0)
+                        
+                        _s_info = _sav.get("surah_info", {})
+                        _s_sadi = _s_info.get("name_turkish") or _sav.get("surah_name_turkish", "")
                         _s_audio = everyayah_url(_s_sno, _s_ano, kari_klasor)
+                        
+                        _s_a_dict = _sav.get("arabic_script")
+                        _s_arapca = _s_a_dict.get("text", "") if isinstance(_s_a_dict, dict) else _sav.get("arabic_text", "")
+                        
+                        _s_t_dict = _sav.get("translation")
+                        _s_turkce = _s_t_dict.get("text", "") if isinstance(_s_t_dict, dict) else _sav.get("text", "")
+                        
                         st.markdown(f"""
                         <div style="background:#080e1a;border:1px solid #1a3050;border-radius:10px;
                                     padding:12px 16px;margin:4px 0;">
                             <div style="font-size:0.7em;color:#2a5a70;">{_s_sadi} — {_s_ano}. Ayet  •  Cüz {_sav.get('juz_number','?')}</div>
-                            <div style="font-family:Amiri,serif;font-size:1.5em;color:#c8a84b;direction:rtl;text-align:right;line-height:2;margin:6px 0;">{_sav.get('arabic_text','')}</div>
-                            <div style="color:#a0c0d8;font-size:0.88em;line-height:1.7;">{_sav.get('text','')}</div>
+                            <div style="font-family:Amiri,serif;font-size:1.5em;color:#c8a84b;direction:rtl;text-align:right;line-height:2;margin:6px 0;">{_s_arapca}</div>
+                            <div style="color:#a0c0d8;font-size:0.88em;line-height:1.7;">{_s_turkce}</div>
                         </div>
                         """, unsafe_allow_html=True)
                         if _s_sno and _s_ano:
