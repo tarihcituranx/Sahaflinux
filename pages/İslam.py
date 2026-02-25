@@ -397,47 +397,62 @@ for k, v in defaults.items():
         st.session_state[k] = v
 
 # ─────────────────────────────────────────────────────────────
-# GEOLOCATION → QUERY PARAMS
+# GEOLOCATION → QUERY PARAMS (GÜNCELLENMİŞ HALİ)
 # ─────────────────────────────────────────────────────────────
 params   = st.query_params
 geo_lat  = params.get("lat",     None)
 geo_lng  = params.get("lng",     None)
 geo_red  = params.get("geo_red", None)
 
-if not geo_lat and not geo_red and not st.session_state.geo_denendi:
+# Eğer koordinat yoksa, red yoksa ve daha önce denenmediyse
+if not geo_lat and not geo_red and not st.session_state.get("geo_denendi", False):
+    
+    # 1. JavaScript Kodu (Otomatik deneme)
     st.components.v1.html("""
     <script>
     (function() {
-        try {
-            var base = window.parent.location.href.split('?')[0];
-            if (!navigator.geolocation) {
-                window.parent.location.href = base + '?geo_red=1'; return;
-            }
+        var base = window.parent.location.href.split('?')[0];
+        
+        function setLocation(lat, lng) {
+            window.parent.location.href = base + '?lat=' + lat + '&lng=' + lng;
+        }
+        
+        function setFail() {
+            // Hata olursa veya zaman aşımı olursa geo_red parametresi ile dön
+            window.parent.location.href = base + '?geo_red=1';
+        }
+
+        if (!navigator.geolocation) {
+            setFail();
+        } else {
             navigator.geolocation.getCurrentPosition(
                 function(pos) {
-                    window.parent.location.href = base
-                        + '?lat=' + pos.coords.latitude.toFixed(5)
-                        + '&lng=' + pos.coords.longitude.toFixed(5);
+                    setLocation(pos.coords.latitude.toFixed(5), pos.coords.longitude.toFixed(5));
                 },
-                function() { window.parent.location.href = base + '?geo_red=1'; },
-                { timeout: 8000, maximumAge: 300000 }
+                function() { 
+                    setFail(); 
+                },
+                { timeout: 5000, maximumAge: 0 } // Timeout süresini 5 saniyeye düşürdük
             );
-        } catch(e) {
-            try { window.parent.location.href = window.parent.location.href.split('?')[0] + '?geo_red=1'; } catch(x) {}
         }
     })();
     </script>
-    <div style="text-align:center;padding:70px 20px;font-family:Tajawal,sans-serif;
-                color:#7a9dbd;background:#080e1a;min-height:200px;">
-        <div style="font-size:2.5em;margin-bottom:12px;">📍</div>
-        <div style="font-size:1.2em;color:#5a8aaa;">Konumunuz tespit ediliyor…</div>
-        <div style="font-size:0.8em;color:#3a5a70;margin-top:8px;">Tarayıcınızda konum izni istenecektir</div>
+    <div style="text-align:center;padding:50px 20px;font-family:sans-serif;color:#7a9dbd;background:#080e1a;">
+        <div style="font-size:2.5em;margin-bottom:10px;">📍</div>
+        <div style="font-size:1.1em;">Konumunuz tespit ediliyor...</div>
+        <div style="font-size:0.8em;color:#555;margin-top:10px;">(İzin penceresi açılmazsa aşağıdaki butona basın)</div>
     </div>
-    """, height=200)
-    st.session_state.geo_denendi = True
-    st.stop()
+    """, height=250)
 
-st.session_state.geo_denendi = True
+    # 2. KURTARICI BUTON: Kullanıcı takılırsa manuel geçmesi için
+    col_man1, col_man2, col_man3 = st.columns([1,2,1])
+    with col_man2:
+        if st.button("📍 Konum Bulunamadı, Manuel Devam Et", use_container_width=True):
+            st.session_state.geo_denendi = True
+            st.rerun()
+
+    # Sayfanın geri kalanını yüklemeyi durdur, JS'nin işini yapmasını bekle
+    st.stop()
 
 # ─────────────────────────────────────────────────────────────
 # ═══════════════  İMSAKİYEM API FONKSİYONLARI  ═══════════════
