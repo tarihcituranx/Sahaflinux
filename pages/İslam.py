@@ -2025,9 +2025,39 @@ with tab3:
                         <div style="color:#3a6080;font-size:0.82em;margin-top:2px;">{len(_sure_icerik)} Ayet • Sayfa {_sure_icerik[0].get('page_number','?') if _sure_icerik else '?'} • Cüz {_sure_icerik[0].get('juz_number','?') if _sure_icerik else '?'}</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    _goster = st.slider("Gösterilecek Ayet", 5, min(50, len(_sure_icerik)), 10, key="diy_sure_sl")
+                    _goster = st.slider("Gösterilecek Ayet Sayısı", 1, len(_sure_icerik), len(_sure_icerik), key="diy_sure_sl")
+                    
+                    # ── TDV İSLÂM ANSİKLOPEDİSİ ──
+                    if _sure_adi_goster:
+                        with st.expander(f"📚 TDV İslâm Ansiklopedisi: {_sure_adi_goster} Suresi"):
+                            try:
+                                import requests
+                                from bs4 import BeautifulSoup
+                                
+                                # Turkish characters replace
+                                tr_map = str.maketrans("çğıöşüâî", "cgiosuai")
+                                raw_slug = _sure_adi_goster.split(" ")[0].lower() # e.g. "Bakara Suresi" -> "bakara"
+                                slug = raw_slug.translate(tr_map).replace(" ", "-")
+                                
+                                tdv_url = f"https://islamansiklopedisi.org.tr/{slug}-suresi"
+                                r_tdv = requests.get(tdv_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=3)
+                                if r_tdv.ok:
+                                    soup = BeautifulSoup(r_tdv.text, "html.parser")
+                                    # Select all meaningful paragraphs from the article body
+                                    pars = soup.select(".article-body p") or soup.select("p")
+                                    tdv_text = "\n\n".join([p.text.strip() for p in pars if len(p.text.strip()) > 50][:4])
+                                    
+                                    if tdv_text:
+                                        st.markdown(f"<div style='font-size:0.9em;color:#a0c0d8;line-height:1.6;'>{tdv_text}...<br><br><a href='{tdv_url}' target='_blank' style='color:#c8a84b;'>Devamını TDV'de Oku ↗</a></div>", unsafe_allow_html=True)
+                                    else:
+                                        st.warning("TDV Ansiklopedisinde bu sureye ait metin bulunamadı.")
+                                else:
+                                    st.error("TDV Ansiklopedisi'ne ulaşılamadı.")
+                            except Exception as e:
+                                st.error(f"TDV bağlantısı sırasında bir hata oluştu: {e}")
+
                     for _av in _sure_icerik[:_goster]:
-                        # VerseResource kesin alanlar: surah_number, verse_number, text, arabic_text, juz_number, page_number
+                        # VerseResource kesin alanlar
                         _sno   = _av.get("surah_id") or _av.get("surah_number", _secili_sure_no)
                         _ano   = _av.get("verse_id_in_surah") or _av.get("verse_number", 0)
                         
@@ -2036,7 +2066,9 @@ with tab3:
                         
                         _a_dict = _av.get("arabic_script")
                         _arapc = _a_dict.get("text", "") if isinstance(_a_dict, dict) else _av.get("arabic_text", "")
-                        _juz   = _av.get("juz_number", "?")
+                        
+                        # API'de ayet bazında cüz bilgisi gelmediğinden sure bazındaki bilgiyi (veya fallback) kullanıyoruz
+                        _juz   = _s_info.get("Cuz", "?") if "_s_info" in locals() and isinstance(_s_info, dict) and "Cuz" in _s_info else _av.get("juz_number", "?")
                         _sayfa = _av.get("page_number", "?")
                         _audio = everyayah_url(_sno, _ano, kari_klasor)
                         st.markdown(f"""
@@ -2063,7 +2095,7 @@ with tab3:
                         <div style="color:#3a6080;font-size:0.85em;margin-top:4px;">{_sure_icerik.get('numberOfAyahs','?') if isinstance(_sure_icerik,dict) else '?'} Ayet • {_vahiy_tr}</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    _goster = st.slider("Gösterilecek Ayet", 5, min(50, len(_ayetler)), 10, key="fb_sure_sl")
+                    _goster = st.slider("Gösterilecek Ayet Sayısı", 1, len(_ayetler), len(_ayetler), key="fb_sure_sl")
                     for _av in _ayetler[:_goster]:
                         _ano = _av.get("numberInSurah", 0)
                         _audio = everyayah_url(_secili_sure_no, _ano, kari_klasor)
