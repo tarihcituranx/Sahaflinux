@@ -1484,8 +1484,8 @@ st.components.v1.html("""
 # ─────────────────────────────────────────────────────────────
 # TABLAR
 # ─────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🕌 Namaz Vakitleri", "🌙 Ramazan", "📖 Kuran-ı Kerim", "🤖 Dini Asistan"
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🕌 Namaz Vakitleri", "🌙 Ramazan", "📖 Kuran-ı Kerim", "🤖 Dini Asistan", "📚 Dijital Kütüphane"
 ])
 
 # ══════════════════════════════════════════════════════════════
@@ -2351,3 +2351,202 @@ KURALLAR:
             if st.button("🗑️ Temizle"):
                 st.session_state.sohbet = []
                 st.rerun()
+
+# ══════════════════════════════════════════════════════════════
+# TAB 5 — DİJİTAL KÜTÜPHANE
+# ══════════════════════════════════════════════════════════════
+with tab5:
+    st.markdown('<div class="bolum-baslik">📚 Diyanet Dijital Kütüphane</div>', unsafe_allow_html=True)
+    
+    lib_tabs = st.tabs(["📖 Kitaplık (PDF)", "🎧 Sesli Eserler", "🕌 İşitsel Kayıtlar", "💧 İlmihal (Abdest)"])
+    
+    # ── KİTAPLIK ──
+    with lib_tabs[0]:
+        import json
+        import os
+        
+        books_path = "t/kitaplik/books.json"
+        cats_path = "t/kitaplik/categories.json"
+        
+        if os.path.exists(books_path) and os.path.exists(cats_path):
+            with open(cats_path, "r", encoding="utf-8") as f:
+                cats = json.load(f)
+            with open(books_path, "r", encoding="utf-8") as f:
+                books = json.load(f)
+                
+            cat_dict = {str(c["id"]): c["name"] for c in cats}
+            cat_names = ["Tümü"] + [c["name"] for c in cats]
+            
+            s_cat = st.selectbox("Kategori Seçiniz:", cat_names, key="lib_cat_sel")
+            
+            filtered_books = []
+            if s_cat == "Tümü":
+                filtered_books = books
+            else:
+                s_cat_id = None
+                for k, v in cat_dict.items():
+                    if v == s_cat:
+                        s_cat_id = k
+                        break
+                if s_cat_id:
+                    filtered_books = [b for b in books if str(b.get("cid", "")) == s_cat_id]
+            
+            total_books = len(filtered_books)
+            st.caption(f"Toplam {total_books} kitap bulundu.")
+            
+            page_size = 12
+            page_idx = st.session_state.setdefault("lib_page_idx", 0)
+            
+            # Reset page_idx if the category changed
+            if st.session_state.get("lib_last_cat") != s_cat:
+                st.session_state.lib_page_idx = 0
+                st.session_state.lib_last_cat = s_cat
+                page_idx = 0
+            
+            c_left, c_mid, c_right = st.columns([1, 2, 1])
+            with c_left:
+                if st.button("⬅️ Önceki", disabled=(page_idx == 0), key="lib_prev"):
+                    st.session_state.lib_page_idx = max(0, page_idx - 1)
+                    st.rerun()
+            with c_mid:
+                st.markdown(f"<div style='text-align:center;color:#a0c0d8;'>Sayfa {page_idx + 1} / {max(1, (total_books - 1) // page_size + 1)}</div>", unsafe_allow_html=True)
+            with c_right:
+                if st.button("Sonraki ➡️", disabled=(page_idx * page_size + page_size >= total_books), key="lib_next"):
+                    st.session_state.lib_page_idx = page_idx + 1
+                    st.rerun()
+            
+            current_books = filtered_books[page_idx * page_size : (page_idx + 1) * page_size]
+            
+            for i in range(0, len(current_books), 4):
+                cols = st.columns(4)
+                for j in range(4):
+                    if i + j < len(current_books):
+                        bk = current_books[i + j]
+                        with cols[j]:
+                            st.markdown(
+                                f'''
+                                <div style="background:#0c1c2e; padding:10px; border-radius:10px; text-align:center; height:100%; border:1px solid #1a3050; margin-bottom:15px;">
+                                    <div style="height:250px; overflow:hidden; border-radius:6px; margin-bottom:10px; background:#080e1a; display:flex; align-items:center;">
+                                        <img src="{bk.get("photo", "")}" style="width:100%;" onerror="this.src='https://diniyayinlar.diyanet.gov.tr/Content/img/logo.png'">
+                                    </div>
+                                    <div style="font-size:0.85em; font-weight:bold; color:#a0c0d8; min-height:45px; display:flex; align-items:center; justify-content:center;">{bk.get("name", "")}</div>
+                                    <a href="{bk.get("path", "#")}" target="_blank" style="display:inline-block; margin-top:10px; background:#c8a84b; color:#080e1a; padding:6px 16px; border-radius:6px; text-decoration:none; font-size:0.85em; font-weight:bold;">📖 PDF İndir/Oku</a>
+                                </div>
+                                ''', unsafe_allow_html=True
+                            )
+        else:
+            st.error("Kitaplık dosyaları (books.json veya categories.json) t/kitaplik/ içerisinde bulunamadı.")
+            
+    # ── SESLİ ESERLER ──
+    with lib_tabs[1]:
+        sk_path = "t/sesli_kitap_playlist_data.json"
+        eh_path = "t/esmaul_husna/esmaul_husna_playlist_data.json"
+        
+        st.markdown('<div style="color:#c8a84b;font-size:1.1em;border-bottom:1px solid #1e3d64;padding-bottom:5px;margin-bottom:15px;">🎧 Diyanet Sesli Kitaplar ve Sohbetler</div>', unsafe_allow_html=True)
+        if os.path.exists(sk_path):
+            with open(sk_path, "r", encoding="utf-8") as f:
+                sk_data = json.load(f)
+            
+            st.caption(f"Örnek içerikler gösteriliyor (Toplam {len(sk_data)} video mevcuttur)")
+            sk_disp = sk_data[:8]
+            for i in range(0, len(sk_disp), 4):
+                cols = st.columns(4)
+                for j in range(4):
+                    if i + j < len(sk_disp):
+                        item = sk_disp[i + j]
+                        with cols[j]:
+                            yt_url = f"https://www.youtube.com{item.get('url', '')}"
+                            thumb = item.get("thumbnail", "https://i.ytimg.com/vi/1YZ9i0rMf_U/hqdefault.jpg")
+                            if not thumb: thumb = "https://i.ytimg.com/vi/1YZ9i0rMf_U/hqdefault.jpg"
+                            st.markdown(
+                                f'''
+                                <a href="{yt_url}" target="_blank" style="text-decoration:none;">
+                                    <div style="background:#0c1c2e; border-radius:10px; overflow:hidden; border:1px solid #1e3d64; margin-bottom:15px;">
+                                        <img src="{thumb}" width="100%" style="display:block;">
+                                        <div style="padding:12px; font-size:0.85em; color:#ddd0b8; min-height:60px;">
+                                            {item.get("title", "")}
+                                        </div>
+                                    </div>
+                                </a>
+                                ''', unsafe_allow_html=True
+                            )
+                            
+        st.markdown('<br><div style="color:#c8a84b;font-size:1.1em;border-bottom:1px solid #1e3d64;padding-bottom:5px;margin-bottom:15px;">✨ İşaret Dili ile Esma-i Hüsna</div>', unsafe_allow_html=True)
+        if os.path.exists(eh_path):
+            with open(eh_path, "r", encoding="utf-8") as f:
+                eh_data = json.load(f)
+            
+            st.caption("Kur'an-ı Kerim'de geçen 99 Esmâ'nın Diyanet İşaret Dili serisi")
+            eh_disp = eh_data[:8] 
+            for i in range(0, len(eh_disp), 4):
+                cols = st.columns(4)
+                for j in range(4):
+                    if i + j < len(eh_disp):
+                        item = eh_disp[i + j]
+                        with cols[j]:
+                            yt_url = f"https://www.youtube.com{item.get('url', '')}"
+                            thumb = item.get("thumbnail", "")
+                            if not thumb: thumb = "https://i.ytimg.com/vi/1YZ9i0rMf_U/hqdefault.jpg"
+                            st.markdown(
+                                f'''
+                                <a href="{yt_url}" target="_blank" style="text-decoration:none;">
+                                    <div style="background:#0c1c2e; border-radius:10px; overflow:hidden; border:1px solid #1e3d64; margin-bottom:15px;">
+                                        <img src="{thumb}" width="100%" style="display:block;">
+                                        <div style="padding:10px; font-size:0.85em; color:#ddd0b8; text-align:center;">
+                                            {item.get("title", "")}
+                                        </div>
+                                    </div>
+                                </a>
+                                ''', unsafe_allow_html=True
+                            )
+
+    # ── İŞİTSEL ──
+    with lib_tabs[2]:
+        st.markdown('<p style="color:#a0c0d8;">Dinlemek istediğiniz MP3 dosyalarını direkt tarayıcınızdan çalabilirsiniz.</p>', unsafe_allow_html=True)
+        ses_dosyalari = [
+            ("🌅 Sabah Ezanı", "t/ezan_sabah.mp3"),
+            ("☀️ Öğle Ezanı", "t/ezan_ogle.mp3"),
+            ("🌤️ İkindi Ezanı", "t/ezan_ikindi.mp3"),
+            ("🌇 Akşam Ezanı", "t/ezan_aksam.mp3"),
+            ("🌃 Yatsı Ezanı", "t/ezan_yatsi.mp3"),
+            ("🤲 Ezan Duası", "t/ezan_duasi.mp3"),
+            ("🕌 Salâ 1", "t/sala.mp3"),
+            ("🕌 Salâ 2", "t/sala_2.mp3"),
+            ("🪈 Ney Taksimi 1", "t/ney.mp3"),
+            ("🪈 Ney Taksimi 2", "t/ney_2.mp3"),
+            ("🪈 Ney Taksimi 3", "t/ney_3.mp3"),
+        ]
+        
+        cols = st.columns(2)
+        idx = 0
+        for ad, yol in ses_dosyalari:
+            if os.path.exists(yol):
+                with cols[idx % 2]:
+                    st.markdown(f"""
+                    <div style="background:#0c1c2e; padding:15px; border-radius:10px; border:1px solid #1e3d64; margin-bottom:15px;">
+                        <span style="color:#c8a84b; font-size:1.1em; font-weight:bold;">{ad}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    with open(yol, "rb") as audio_file:
+                        st.audio(audio_file.read(), format='audio/mp3')
+                idx += 1
+
+    # ── ABDEST ──
+    with lib_tabs[3]:
+        st.markdown('<p style="color:#a0c0d8;">Aşağıdaki görselleri takip ederek Hanefi mezhebine göre abdest alma adımlarını öğrenebilirsiniz.</p>', unsafe_allow_html=True)
+        abdest_klasor = "t/abdest"
+        if os.path.exists(abdest_klasor):
+            img_list = []
+            for i in range(1, 13):
+                p = os.path.join(abdest_klasor, f"img{i}.jpg")
+                if os.path.exists(p):
+                    img_list.append(p)
+            
+            for i in range(0, len(img_list), 3):
+                cols = st.columns(3)
+                for j in range(3):
+                    if i + j < len(img_list):
+                        with cols[j]:
+                            st.markdown(f'<div style="text-align:center; color:#c8a84b; font-weight:bold; margin-bottom:5px;">Adım {i+j+1}</div>', unsafe_allow_html=True)
+                            st.image(img_list[i+j], use_container_width=True)
+                            st.markdown("<br>", unsafe_allow_html=True)
