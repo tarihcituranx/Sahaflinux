@@ -401,15 +401,6 @@ for k, v in defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ─────────────────────────────────────────────────────────────
-# İLK AÇILIŞTA VARSAYILAN KONUM: SAMSUN / ATAKUM
-# ─────────────────────────────────────────────────────────────
-if not st.session_state.konum_adi and not st.session_state.ilce_id:
-    _def_id, _def_adi = varsayilan_konum_yukle()
-    if _def_id:
-        st.session_state.ilce_id   = _def_id
-        st.session_state.konum_adi = _def_adi
-        st.session_state.kaynak    = "imsakiyem"
 
 # ─────────────────────────────────────────────────────────────
 # GEOLOCATION → QUERY PARAMS
@@ -884,6 +875,16 @@ def konum_eslestir_emushaf(lat: float, lng: float):
         eslesme_sehir,
         eslesme_ilce,
     )
+
+# ─────────────────────────────────────────────────────────────
+# İLK AÇILIŞTA VARSAYILAN KONUM: SAMSUN / ATAKUM
+# ─────────────────────────────────────────────────────────────
+if not st.session_state.konum_adi and not st.session_state.ilce_id:
+    _def_id, _def_adi = varsayilan_konum_yukle()
+    if _def_id:
+        st.session_state.ilce_id   = _def_id
+        st.session_state.konum_adi = _def_adi
+        st.session_state.kaynak    = "imsakiyem"
 
 # ─────────────────────────────────────────────────────────────
 # GEO KOORDİNATLARINDAN OTOMATİK KONUM BELİRLE
