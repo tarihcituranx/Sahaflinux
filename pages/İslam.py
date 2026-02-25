@@ -871,7 +871,9 @@ def im_vakit_normalize(v: dict) -> dict:
     hicri = v.get("hijri_date") or v.get("hijriDate") or v.get("hijri") or {}
 
     try:
-        dt = datetime.strptime(tarih_iso, "%Y-%m-%d")
+        # Eğer "2026-02-25T00:00:00.000Z" gibi uzun ISO geliyorsa T'den öncesini al (Y-m-d)
+        safe_iso = tarih_iso.split("T")[0] if "T" in tarih_iso else tarih_iso
+        dt = datetime.strptime(safe_iso, "%Y-%m-%d")
         tarih_kisa = dt.strftime("%d.%m.%Y")
         gun_adi = GUN_ADLARI.get(dt.strftime("%A"), dt.strftime("%A"))
     except Exception:
@@ -1972,21 +1974,25 @@ with tab3:
                     return s.get("verse_count") or s.get("ayah_count") or s.get("verses_count") or "?"
 
                 sure_sec_d = {
-                    f"{_sure_id(s):3}. {_sure_tr(s)}  {_sure_ar(s)}  — {_sure_ayet(s)} ayet": _sure_id(s)
+                    f"{_sure_id(s):>3}. {_sure_tr(s)}  {_sure_ar(s)}  — {_sure_ayet(s)} ayet": _sure_id(s)
                     for s in _diy_sureler if _sure_id(s)
                 }
                 _secili_sure_str = st.selectbox("Sure Seç", list(sure_sec_d.keys()), index=0, key="diy_sure_sb")
-                _secili_sure_no  = sure_sec_d[_secili_sure_str]
+                _secili_sure_no = sure_sec_d.get(_secili_sure_str)
+                if _secili_sure_no is None:
+                    _secili_sure_no = list(sure_sec_d.values())[0] if sure_sec_d else 1
             else:
                 # Fallback: alquran.cloud sure listesi
                 _fb_sureler = sure_listesi_getir()
                 if _fb_sureler:
                     sure_sec_d = {
-                        f"{s['number']:3}. {s.get('name','')}  —  {s.get('englishName','')}": s["number"]
+                        f"{s['number']:>3}. {s.get('name','')}  —  {s.get('englishName','')}": s["number"]
                         for s in _fb_sureler
                     }
                     _secili_sure_str = st.selectbox("Sure Seç", list(sure_sec_d.keys()), index=0, key="fb_sure_sb")
-                    _secili_sure_no  = sure_sec_d[_secili_sure_str]
+                    _secili_sure_no = sure_sec_d.get(_secili_sure_str)
+                    if _secili_sure_no is None:
+                        _secili_sure_no = list(sure_sec_d.values())[0] if sure_sec_d else 1
                 else:
                     _secili_sure_no = 1
 
