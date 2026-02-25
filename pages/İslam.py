@@ -545,6 +545,25 @@ def ramazan_kontrol(tarih_str: str):
     except:
         return None
 
+@st.cache_data(ttl=3600)
+def hicri_tarih_getir(tarih_iso: str) -> str:
+    """Aladdin API'den Hicri tarihi çek (YYYY-MM-DD → Hicri string)"""
+    try:
+        r = requests.get(
+            f"https://api.aladhan.com/v1/gToH/{tarih_iso.replace('-', '-')}",
+            timeout=6
+        )
+        if r.ok:
+            d = r.json().get("data", {}).get("hijri", {})
+            gun  = d.get("day", "")
+            ay   = d.get("month", {}).get("ar", "") or d.get("month", {}).get("en", "")
+            yil  = d.get("year", "")
+            if gun and yil:
+                return f"{gun} {ay} {yil}"
+    except Exception:
+        pass
+    return ""
+
 @st.cache_data(ttl=86400)
 def sure_listesi_getir():
     try:
@@ -690,8 +709,15 @@ def im_vakit_normalize(v: dict) -> dict:
             hicri.get("full_date") or hicri.get("fullDate") or
             f"{hicri.get('day','?')} {hicri.get('month_name') or hicri.get('monthName','?')} {hicri.get('year','?')}"
         )
+    elif isinstance(hicri, str) and hicri:
+        # ISO string gibi "2026-02-25T00:00:00.000Z" gelirse temizle
+        hicri_str = hicri.split("T")[0] if "T" in hicri else hicri
     else:
-        hicri_str = str(hicri)
+        hicri_str = ""
+
+    # Eğer hicri_str hâlâ ISO tarih formatındaysa veya boşsa Aladdin API'sini dene
+    if hicri_str and ("T" in hicri_str or len(hicri_str) < 4):
+        hicri_str = ""
 
     return {
         "imsak":      _saat(["imsak", "Imsak", "fajr", "Fajr"]),
@@ -1193,7 +1219,15 @@ ramazan_mi   = (
 # ─────────────────────────────────────────────────────────────
 # HERO
 # ─────────────────────────────────────────────────────────────
-hicri_str  = bugun_vakit["hicri_str"] if bugun_vakit else "—"
+hicri_str = ""
+if bugun_vakit:
+    hicri_str = bugun_vakit.get("hicri_str", "")
+    # API'den boş veya bozuk geldiyse Aladhan API'sini kullan
+    if not hicri_str or "T" in hicri_str or len(hicri_str) < 5:
+        _h_iso = bugun_vakit.get("tarih_iso") or bugun_iso
+        hicri_str = hicri_tarih_getir(_h_iso)
+if not hicri_str:
+    hicri_str = "—"
 miladi_str = tr_tarih_format(now_tr)
 saat_str   = now_tr.strftime("%H:%M:%S")
 
@@ -1390,27 +1424,27 @@ with tab1:
 
         # Kıble pusulası (SVG)
         kible_svg = f"""
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
-            <svg width="72" height="72" viewBox="0 0 72 72">
-                <circle cx="36" cy="36" r="33" fill="#0c1c2e" stroke="#1e3d64" stroke-width="2"/>
-                <circle cx="36" cy="36" r="2" fill="#c8a84b"/>
-                <!-- Kuzey etiketi -->
-                <text x="36" y="10" text-anchor="middle" fill="#4a7a9b" font-size="8" font-family="Tajawal">K</text>
-                <!-- Kıble oku -->
-                <g transform="rotate({_kible_aci:.1f}, 36, 36)">
-                    <polygon points="36,6 33,36 36,42 39,36" fill="#c8a84b"/>
-                    <polygon points="36,66 33,36 36,30 39,36" fill="#2a4a6a"/>
-                </g>
-            </svg>
-            <div style="font-size:0.75em;color:#c8a84b;margin-top:2px;">{_kible_aci:.1f}°</div>
-        </div>
+        <svg width="60" height="60" viewBox="0 0 60 60">
+            <circle cx="30" cy="30" r="28" fill="#0a1628" stroke="#1e3d64" stroke-width="1.5"/>
+            <text x="30" y="9" text-anchor="middle" fill="#4a7a9b" font-size="7" font-family="Tajawal,sans-serif">K</text>
+            <text x="30" y="57" text-anchor="middle" fill="#2a4a6a" font-size="7" font-family="Tajawal,sans-serif">G</text>
+            <text x="7"  y="33" text-anchor="middle" fill="#2a4a6a" font-size="7" font-family="Tajawal,sans-serif">B</text>
+            <text x="53" y="33" text-anchor="middle" fill="#2a4a6a" font-size="7" font-family="Tajawal,sans-serif">D</text>
+            <circle cx="30" cy="30" r="2" fill="#c8a84b"/>
+            <g transform="rotate({_kible_aci:.1f}, 30, 30)">
+                <polygon points="30,5 27.5,30 30,36 32.5,30" fill="#c8a84b"/>
+                <polygon points="30,55 27.5,30 30,24 32.5,30" fill="#2a4060"/>
+            </g>
+        </svg>
         """
 
         with c1:
             st.markdown(f"""
-            <div class="bilgi-kutu" style="height:130px;">
+            <div class="bilgi-kutu">
+                <div style="font-size:1.2em;margin-bottom:2px;">🕋</div>
                 {kible_svg}
-                <div class="bilgi-etiket" style="margin-top:4px;">Kıble Yönü</div>
+                <div style="font-size:0.75em;color:#c8a84b;line-height:1;">{_kible_aci:.1f}°</div>
+                <div class="bilgi-etiket">Kıble Yönü</div>
             </div>
             """, unsafe_allow_html=True)
 
