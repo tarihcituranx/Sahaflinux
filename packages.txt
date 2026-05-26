@@ -6,6 +6,5 @@ libtesseract-dev
 poppler-utils
 djvulibre-bin
 libgl1
-libglib2.0-0
 ghostscript
 build-essential
